@@ -673,6 +673,9 @@ function varHints(v){
   return h;
 }
 function hintsHtml(v){return varHints(v).map(h=>`<div class="hint-l ${h.lvl}">${h.lvl==='error'?'✕ ':h.lvl==='warn'?'! ':h.lvl==='ok'?'✓ ':'· '}${esc(h.msg)}</div>`).join('')}
+// 当前变量和哪个预设完全一致（预设里列出的每一项都相同）
+const presetOf=v=>Object.keys(PRESETS).find(k=>Object.entries(PRESETS[k]).every(([key,val])=>String(v[key])===String(val)))||null;
+function presetRowHtml(v){const cur=presetOf(v);return `<span class="hint">预设：</span>${Object.keys(PRESETS).map(k=>`<button class="btn${k===cur?' primary':''}" data-preset="${esc(k)}" aria-pressed="${k===cur}">${k===cur?'✓ ':''}${esc(k)}</button>`).join('')}<span class="hint">${cur?'当前：'+esc(cur):'当前：自定义（和任何预设都不完全一样）'}</span>`}
 function renderInputs(){
   const I=S.P.inputs,v=I.vars;const isExample=I.idea.startsWith('示例')||I.skeleton.startsWith('示例');
   $('#work').innerHTML=`<h2>0 · 输入与定变量</h2><p class="lead">做一个 RPG 只需要你准备三样东西：一个世界的点子、一段你想让玩家经历的故事、几个决定游戏多大的选项。剩下的设定、任务、对白、数值都由后面的环节生成。</p>
@@ -687,14 +690,15 @@ function renderInputs(){
   <label class="f"><span>故事骨架（也可以粘贴一章小说）</span><textarea id="skel" style="min-height:160px">${esc(I.skeleton)}</textarea></label>
   <div id="askOut"></div></div>
   <div class="card"><h3 style="margin-top:0">变量：决定游戏多大、怎么玩</h3><p class="hint" style="margin:0 0 8px">不确定就用预设，每一项下面都有解释。这些值是后面每个环节的约束，AI 会在这个范围内生成。</p>
-  <div class="row" style="margin-bottom:12px"><span class="hint">预设：</span>${Object.keys(PRESETS).map(k=>`<button class="btn" data-preset="${esc(k)}">${esc(k)}</button>`).join('')}</div>
+  <div class="row" style="margin-bottom:12px" id="presetRow">${presetRowHtml(v)}</div>
   ${VAR_GROUPS.map(gp=>`<div class="vgroup"><h4>${esc(gp.title)}</h4>${gp.intro?`<p class="hint">${esc(gp.intro)}</p>`:''}<div class="vars">${gp.keys.map(k=>{const vv=VARS.find(x=>x[0]===k);const [key,lab,type,opts,def,help]=vv;const val=v[key]??def;const ctl=type==='select'?`<select data-k="${key}">${opts.map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select>`:`<input type="${type}" data-k="${key}" value="${esc(val)}">`;return `<label class="f"><span>${lab}</span>${ctl}<small class="help">${esc(help)}</small></label>`}).join('')}</div></div>`).join('')}
   <h4 style="margin:14px 0 0;font-size:13px">变量之间的约束</h4><p class="hint" style="margin:0 0 4px">改任何一项都会即时重算。红色的必须改掉才能确认输入。</p><div class="hints" id="varHints">${hintsHtml(v)}</div></div>
   <div class="row"><button class="btn primary" id="btnConfirm">确认输入，进入环节 1</button><span class="hint">${S.sample?'接下来每个环节点一次"用 AI 生成"，看一眼结果，通过就到下一环节。':'提示：还没有可用的文本模型，点右上角"⚙ 设置"配置后再生成。'}</span></div>`;
   const bind=(sel,fn)=>document.querySelectorAll(sel).forEach(el=>['input','change'].forEach(ev=>el.addEventListener(ev,()=>{fn(el);markSave()})));
   bind('#pname',el=>{S.P.name=el.value;$('#ttl').textContent=el.value;renderRail()});bind('#idea',el=>I.idea=el.value);bind('#skel',el=>I.skeleton=el.value);
-  bind('[data-k]',el=>{v[el.dataset.k]=el.type==='number'?Number(el.value):el.value;const hb=$('#varHints');if(hb)hb.innerHTML=hintsHtml(v)});
-  document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{Object.assign(v,PRESETS[b.dataset.preset]);markSave();render();toast('已应用预设：'+b.dataset.preset)});
+  const bindPresets=()=>document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{Object.assign(v,PRESETS[b.dataset.preset]);markSave();render();toast('已应用预设：'+b.dataset.preset)});
+  bind('[data-k]',el=>{v[el.dataset.k]=el.type==='number'?Number(el.value):el.value;const hb=$('#varHints');if(hb)hb.innerHTML=hintsHtml(v);const pr=$('#presetRow');if(pr){pr.innerHTML=presetRowHtml(v);bindPresets()}});
+  bindPresets();
   $('#btnTpl').onclick=()=>{I.skeleton=(I.skeleton.startsWith('示例')?'':I.skeleton.trim()+'\n\n')+SKELETON_TEMPLATE;markSave();render()};
   $('#btnAsk').onclick=askSkeleton;
   bind('#seed',el=>I.seed=el.value);$('#btnGen').onclick=genInputs;
