@@ -530,7 +530,7 @@ async function runStage(n,opts={}){
   S.running=n;S.ctl=new AbortController();setStatus(n,'run');render();
   const box=$('#stream');let raw='';const prompt=promptFor(n,opts);const t0=Date.now();
   try{
-    const data=await S.sample.json(prompt,{signal:S.ctl.signal,modelTier:S.tier,cache:false,onText:({text})=>{raw=text;if(box){box.textContent=text;box.scrollTop=box.scrollHeight}}});
+    const data=await S.sample.json(prompt,{signal:S.ctl.signal,modelTier:S.tier,cache:false,onText:({text,think})=>{raw=text;if(box){box.textContent=text||(think?`模型在思考…已想 ${think} 字（思考完才开始写，稍等）`:'');box.scrollTop=box.scrollHeight}}});
     if(n===9){S.stages[9]=Object.assign({},S.stages[9]||{},{ai:Array.isArray(data.issues)?data.issues:[],aiAt:Date.now(),aiMs:Date.now()-t0});setStatus(9,stOf(9)==='done'?'done':'')}
     else{
       const old=S.stages[n]?.data;let newData=data;
@@ -711,7 +711,7 @@ async function genInputs(){
 4. vars：下面每个变量都要给值。点子里提到的体量、战斗、风格等要求优先遵守，没提到的按"小而能做完"的思路选。
 ${spec}
 变量之间必须满足：主线+支线任务数约为时长×4 到 时长×6；章节数不超过主线任务数；无分支时结局数=1，多结局时结局数≥2，小分支大汇合时结局数 1-2；NPC 上限至少为 ceil(主线/3)+1；等级上限不超过时长×12 且不少于章节数×3；区域类型的种数不超过地图数；技能树数×层数不超过 16。
-请只输出 JSON：{"name":"","idea":"","skeleton":"","vars":{${VARS.map(x=>`"${x[0]}":…`).join(',')}}}`,{modelTier:'quick',cache:false,onText:({text})=>{const o=$('#genOut');if(o)o.innerHTML=`<div class="status">AI 正在构思…已写 ${text.length} 字</div>`}});
+请只输出 JSON：{"name":"","idea":"","skeleton":"","vars":{${VARS.map(x=>`"${x[0]}":…`).join(',')}}}`,{modelTier:'quick',cache:false,onText:({text,think})=>{const o=$('#genOut');if(o)o.innerHTML=`<div class="status">${text.length?`AI 正在写…已写 ${text.length} 字`:think?`模型在思考…已想 ${think} 字（思考完才开始写，稍等）`:'AI 正在构思…'}</div>`}});
     if(r.name&&String(r.name).trim()){S.P.name=String(r.name).trim();$('#ttl').textContent=S.P.name}
     if(r.idea)I.idea=String(r.idea);if(r.skeleton)I.skeleton=String(r.skeleton);
     const rv=r.vars||{};VARS.forEach(([k,,type,opts])=>{if(rv[k]==null||rv[k]==='')return;let x=rv[k];if(type==='number'){x=Math.round(Number(x));if(!isFinite(x)||x<0)return}else if(type==='select'){x=String(x);if(!opts.includes(x))return}else x=String(x);v[k]=x});
@@ -1084,12 +1084,12 @@ const errOf=(e,o,text)=>({code:o&&o.signal&&o.signal.aborted?'cancelled':'networ
 const promptOf=input=>typeof input==='string'?input:input.map(m=>m.content).join('\n');
 function jsonOf(text){const s=text.indexOf('{'),e=text.lastIndexOf('}');if(s<0||e<=s)throw {code:'bad_json',message:'模型回复里没有 JSON 对象',text};try{return JSON.parse(text.slice(s,e+1))}catch(err){throw {code:'bad_json',message:'JSON 解析失败：'+err.message,text}}}
 function withJson(fn){fn.json=async(input,o)=>jsonOf((await fn(input,o)).text);fn.limits=async()=>({images:false});return fn}
-async function readStream(r,o,onChunk){const rd=r.body.getReader();const dec=new TextDecoder();let text='',buf='';
+async function readStream(r,o,onChunk){const rd=r.body.getReader();const dec=new TextDecoder();let text='',buf='',think=0;
   while(true){const {value,done}=await rd.read();if(done)break;const part=dec.decode(value,{stream:true});
-    if(onChunk){buf+=part;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).trim();buf=buf.slice(i+1);const d=onChunk(line);if(d)text+=d}}else text+=part;
-    if(o.onText)o.onText({text,delta:''})}
+    if(onChunk){buf+=part;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).trim();buf=buf.slice(i+1);const d=onChunk(line);if(typeof d==='string')text+=d;else if(d&&d.reason)think+=d.reason.length}}else text+=part;
+    if(o.onText)o.onText({text,delta:'',think})}
   return text}
-const sseDelta=line=>{if(!line.startsWith('data:'))return '';const d=line.slice(5).trim();if(d==='[DONE]')return '';try{const j=JSON.parse(d);const c=j.choices&&j.choices[0]&&j.choices[0].delta&&j.choices[0].delta.content;return typeof c==='string'?c:''}catch(e){return ''}};
+const sseDelta=line=>{if(!line.startsWith('data:'))return '';const d=line.slice(5).trim();if(d==='[DONE]')return '';try{const j=JSON.parse(d);const dl=j.choices&&j.choices[0]&&j.choices[0].delta||{};const c=dl.content;if(typeof c==='string'&&c)return c;const rc=dl.reasoning_content||dl.reasoning;return typeof rc==='string'&&rc?{reason:rc}:''}catch(e){return ''}};
 // text via our backend
 const backendSample=()=>withJson(async(input,o={})=>{const b=cfgGet().backend;const base=beBase(b);let r;
   try{r=await fetch(base+'/api/generate',{method:'POST',headers:apiHeaders(b,true),body:JSON.stringify({prompt:promptOf(input),tier:o.modelTier||'default'}),signal:o.signal})}
