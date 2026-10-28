@@ -1083,7 +1083,7 @@ const llmHeaders=t=>{const h={'content-type':'application/json',authorization:'B
 const errOf=(e,o,text)=>({code:o&&o.signal&&o.signal.aborted?'cancelled':'network',message:String(e&&e.message||e),text});
 const promptOf=input=>typeof input==='string'?input:input.map(m=>m.content).join('\n');
 function jsonOf(text){const s=text.indexOf('{'),e=text.lastIndexOf('}');if(s<0||e<=s)throw {code:'bad_json',message:'模型回复里没有 JSON 对象',text};try{return JSON.parse(text.slice(s,e+1))}catch(err){throw {code:'bad_json',message:'JSON 解析失败：'+err.message,text}}}
-function withJson(fn){fn.json=async(input,o)=>{const r=await fn(input,o);try{return jsonOf(r.text)}catch(e){if(r.truncated)e.message=(r.text?'回答写到一半被截断了':'模型把输出额度全用在思考上，还没开始写答案')+'（超过了 max_tokens）。换一个不带思考的模型，或在设置里换个模型名再试。';throw e}};fn.limits=async()=>({images:false});return fn}
+function withJson(fn){fn.json=async(input,o)=>{const r=await fn(input,o);try{return jsonOf(r.text)}catch(e){if(r.truncated)e.message=(r.text?'回答写到一半被截断了':'模型把输出额度全用在思考上，还没开始写答案')+'（超过了输出长度上限）。再点一次试试，或换一个思考更短的模型。';throw e}};fn.limits=async()=>({images:false});return fn}
 async function readStream(r,o,onChunk,meta={}){const rd=r.body.getReader();const dec=new TextDecoder();let text='',buf='',think=0;
   while(true){const {value,done}=await rd.read();if(done)break;const part=dec.decode(value,{stream:true});
     if(onChunk){buf+=part;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).trim();buf=buf.slice(i+1);const d=onChunk(line);if(typeof d==='string')text+=d;else if(d){if(d.reason)think+=d.reason.length;if(d.finish)meta.finish=d.finish}}}else text+=part;
@@ -1098,8 +1098,8 @@ const backendSample=()=>withJson(async(input,o={})=>{const b=cfgGet().backend;co
   let text='';try{text=await readStream(r,o,null)}catch(e){throw errOf(e,o,text)}return {text,truncated:false}});
 // text straight from the browser with the user's own key (OpenAI-compatible chat/completions)
 const directSample=()=>withJson(async(input,o={})=>{const t=cfgGet().text;let r;
-  // 火山方舟上的思考型模型默认先想再写，思考也占 max_tokens，长 prompt 会想到一半就被截断；这里关掉思考
-  const ark=/volces\.com/.test(t.base);const call=noThink=>fetch(t.base.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:llmHeaders(t),body:JSON.stringify(Object.assign({model:t.model,stream:true,temperature:0.7,max_tokens:8192,messages:[{role:'user',content:promptOf(input)}]},noThink?{thinking:{type:'disabled'}}:{})),signal:o.signal});
+  // 火山方舟上的思考型模型先想再写，思考也占输出额度，8192 不够长 prompt 用；改用含思考的 max_completion_tokens 给足额度，不认这个参数就退回 max_tokens
+  const ark=/volces\.com/.test(t.base);const call=big=>fetch(t.base.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:llmHeaders(t),body:JSON.stringify(Object.assign({model:t.model,stream:true,temperature:0.7,messages:[{role:'user',content:promptOf(input)}]},big?{max_completion_tokens:32768}:{max_tokens:8192})),signal:o.signal});
   try{if(ark){try{r=await call(true)}catch(e){if(o.signal&&o.signal.aborted)throw e}if(!r||r.status===400)r=await call(false)}else r=await call(false)}
   catch(e){throw errOf({message:'连不上 '+t.base+'：'+e.message+'。可能是这个接口不允许浏览器直连（跨域），改用后端模式。'},o)}
   if(!r.ok){const txt=await r.text().catch(()=>'');throw {code:r.status===401?'not_authorized':'server',message:`接口返回 ${r.status}：${txt.slice(0,200)}`}}
