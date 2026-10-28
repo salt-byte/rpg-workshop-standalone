@@ -130,12 +130,15 @@ summary{cursor:pointer;font-weight:600;font-size:13px}
 .bar.fp i{background:#4f86d6}
 .empty{padding:40px 20px;text-align:center;color:var(--muted)}
 /* design cards */
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:10px}
-.ccard{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr));gap:12px;margin-bottom:10px}
+.ccard{display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
 .ccard .pt{display:flex;flex-direction:column;gap:6px;align-items:center}
-.ccard img{width:96px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
-.ccard .ph{width:96px;height:120px;border-radius:8px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:var(--muted)}
+.ccard img{width:200px;height:267px;object-fit:cover;object-position:top;border-radius:8px;border:1px solid var(--line);cursor:zoom-in}
+.ccard .ph{width:200px;height:267px;border-radius:8px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:var(--muted)}
 .ccard .up{font-size:12px;padding:4px 8px}
+@media (max-width:600px){.ccard{grid-template-columns:minmax(0,1fr)}.ccard img,.ccard .ph{width:100%;height:auto;aspect-ratio:3/4}}
+.lightbox{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
+.lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
 .ccard .cn{font-weight:700;margin-bottom:4px}
 .kv.small{font-size:12.5px;gap:2px 10px;margin:4px 0 6px}
 .swatches{display:flex;gap:4px;flex-wrap:wrap}
@@ -1133,6 +1136,8 @@ async function genPortrait(cid){const d=S.stages[3]?.data;const ch=(d?.character
     const m=stMeta(3);m.imgRuns=(m.imgRuns||0)+1;await saveStage(3);toast(ch.name+' 的立绘已生成')}
   catch(e){const msg=String(e.message||e);S.imgErr[cid]=msg;toast(ch.name+' 生成失败，原因写在卡片上')}
   S.genImg.delete(cid);render()}
+document.addEventListener('click',e=>{const im=e.target.closest&&e.target.closest('.ccard .pt img');if(!im)return;const lb=document.createElement('div');lb.className='lightbox';lb.innerHTML=`<img src="${esc(im.src)}" alt="${esc(im.alt)}">`;lb.onclick=()=>lb.remove();document.body.appendChild(lb)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.lightbox').forEach(x=>x.remove())});
 async function genAllPortraits(){const chars=(S.stages[3]?.data?.characters||[]).filter(c=>!portraitUrl(c));for(const c of chars){if(S.cur!==3)break;await genPortrait(c.id)}}
 /* settings sheet */
 function cfgUI(){
