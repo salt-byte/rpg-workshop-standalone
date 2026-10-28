@@ -674,10 +674,13 @@ function renderInputs(){
   const I=S.P.inputs,v=I.vars;const isExample=I.idea.startsWith('示例')||I.skeleton.startsWith('示例');
   $('#work').innerHTML=`<h2>0 · 输入与定变量</h2><p class="lead">做一个 RPG 只需要你准备三样东西：一个世界的点子、一段你想让玩家经历的故事、几个决定游戏多大的选项。剩下的设定、任务、对白、数值都由后面的环节生成。</p>
   ${isExample?'<div class="status">现在填的是示例内容，可以直接用它先跑一遍流程看看效果，也可以整段替换成你自己的。</div>':''}
+  <div class="card"><h3 style="margin-top:0">一句话生成全部</h3><p class="hint" style="margin:0 0 8px">写一句点子（题材、氛围、想要的体量都行），AI 会一次填好项目名、世界观 idea、故事骨架和下面全部变量。生成后每一项都能再手改；会覆盖当前内容。</p>
+  <div class="row"><input type="text" id="seed" style="flex:1;min-width:220px" placeholder="比如：蒸汽朋克侦探，雾都连环失踪案，1 小时短篇，不要战斗" value="${esc(I.seed||'')}"><button class="btn primary" id="btnGen" ${S.sample&&!S.genInputs?'':'disabled'}>${S.genInputs?'生成中…':'✨ AI 生成'}</button></div>
+  <div id="genOut"></div></div>
   <div class="card"><label class="f"><span>项目名</span><input type="text" id="pname" value="${esc(S.P.name)}"></label>
   <div class="guide"><div><div class="gl">什么是世界观 idea</div><p>一两段话，说清三件事：这个世界和现实哪里不一样；谁和谁在争什么（核心冲突）；主角是谁、被怎么卷进来。不用写剧情。</p></div><div><div class="gl">怎么写才好用</div><ul><li>有一个具体的地方，比如"被潮汐封锁的港口城"，比"奇幻大陆"好</li><li>冲突要能打起来、能选边，后面的任务和分支都从它长出来</li><li>给一两个只有这个世界才有的东西（潮语、旧神），AI 会围绕它们扩写</li></ul></div></div>
   <label class="f"><span>世界观 idea</span><textarea id="idea">${esc(I.idea)}</textarea></label>
-  <div class="guide"><div><div class="gl">什么是故事骨架</div><p>你希望玩家按顺序经历的大事，300–500 字。按章写，每章 1–3 件事，最后写结局怎么分。这一段必须由人来写：AI 不会替你编剧情，只会把它扩成设定、任务和对白。</p></div><div><div class="gl">检查清单</div><ul><li>主角想要什么（动机）写了吗</li><li>每章有没有一个"发现"或"转折"</li><li>结局的分叉对应某个玩家要做的选择吗</li></ul><div class="row" style="margin-top:6px"><button class="btn ghost" id="btnTpl">插入填空模板</button><button class="btn ghost" id="btnAsk" ${S.sample?'':'disabled'}>让 AI 给我的骨架提问题</button></div></div></div>
+  <div class="guide"><div><div class="gl">什么是故事骨架</div><p>你希望玩家按顺序经历的大事，300–500 字。按章写，每章 1–3 件事，最后写结局怎么分。最好自己写，或用上面的一句话生成后再改：后面的环节不会再编剧情，只会把它扩成设定、任务和对白。</p></div><div><div class="gl">检查清单</div><ul><li>主角想要什么（动机）写了吗</li><li>每章有没有一个"发现"或"转折"</li><li>结局的分叉对应某个玩家要做的选择吗</li></ul><div class="row" style="margin-top:6px"><button class="btn ghost" id="btnTpl">插入填空模板</button><button class="btn ghost" id="btnAsk" ${S.sample?'':'disabled'}>让 AI 给我的骨架提问题</button></div></div></div>
   <label class="f"><span>故事骨架（也可以粘贴一章小说）</span><textarea id="skel" style="min-height:160px">${esc(I.skeleton)}</textarea></label>
   <div id="askOut"></div></div>
   <div class="card"><h3 style="margin-top:0">变量：决定游戏多大、怎么玩</h3><p class="hint" style="margin:0 0 8px">不确定就用预设，每一项下面都有解释。这些值是后面每个环节的约束，AI 会在这个范围内生成。</p>
@@ -691,7 +694,30 @@ function renderInputs(){
   document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{Object.assign(v,PRESETS[b.dataset.preset]);markSave();render();toast('已应用预设：'+b.dataset.preset)});
   $('#btnTpl').onclick=()=>{I.skeleton=(I.skeleton.startsWith('示例')?'':I.skeleton.trim()+'\n\n')+SKELETON_TEMPLATE;markSave();render()};
   $('#btnAsk').onclick=askSkeleton;
+  bind('#seed',el=>I.seed=el.value);$('#btnGen').onclick=genInputs;
   $('#btnConfirm').onclick=()=>{if(!I.idea.trim()||!I.skeleton.trim()){toast('idea 和故事骨架不能为空');return}if(I.skeleton.includes('____')){toast('骨架里还有没填的空');return}const bad=varHints(v).filter(h=>h.lvl==='error');if(bad.length){toast('变量有冲突：'+bad[0].msg);const hb=$('#varHints');if(hb&&hb.scrollIntoView)hb.scrollIntoView({block:'center'});return}setStatus(0,'done');S.cur=1;render()};
+}
+async function genInputs(){
+  if(!S.sample){toast('还没有可用的文本模型，点右上角"⚙ 设置"');return}
+  const I=S.P.inputs,v=I.vars;const seed=(I.seed||'').trim();if(!seed){toast('先写一句点子');return}
+  S.genInputs=true;render();const out=$('#genOut');if(out)out.innerHTML='<div class="status">AI 正在构思…</div>';
+  const spec=VARS.map(([k,lab,type,opts,def,help])=>`- ${k}（${lab}）：${type==='select'?'只能取 '+opts.map(o=>`"${o}"`).join(' / '):type==='number'?'整数':'文本'}。${help}`).join('\n');
+  try{const r=await S.sample.json(`你是资深 RPG 策划，帮一个第一次做游戏的人从一句点子出发，定好开工所需的全部输入。用中文。
+【点子】${seed}
+要求：
+1. name：项目名，2-8 个字。
+2. idea：世界观，一两段话，说清这个世界和现实哪里不一样、谁和谁在争什么（核心冲突）、主角是谁怎么被卷进来；要有一个具体地点和一两个只有这个世界才有的东西。
+3. skeleton：故事骨架 300-500 字，按章写，每章 1-3 件事（有发现或转折），最后写结局怎么分、对应玩家的哪个选择。章节数和结局数必须和 vars 一致。
+4. vars：下面每个变量都要给值。点子里提到的体量、战斗、风格等要求优先遵守，没提到的按"小而能做完"的思路选。
+${spec}
+变量之间必须满足：主线+支线任务数约为时长×4 到 时长×6；章节数不超过主线任务数；无分支时结局数=1，多结局时结局数≥2，小分支大汇合时结局数 1-2；NPC 上限至少为 ceil(主线/3)+1；等级上限不超过时长×12 且不少于章节数×3；区域类型的种数不超过地图数；技能树数×层数不超过 16。
+请只输出 JSON：{"name":"","idea":"","skeleton":"","vars":{${VARS.map(x=>`"${x[0]}":…`).join(',')}}}`,{modelTier:'quick',cache:false,onText:({text})=>{const o=$('#genOut');if(o)o.innerHTML=`<div class="status">AI 正在构思…已写 ${text.length} 字</div>`}});
+    if(r.name&&String(r.name).trim()){S.P.name=String(r.name).trim();$('#ttl').textContent=S.P.name}
+    if(r.idea)I.idea=String(r.idea);if(r.skeleton)I.skeleton=String(r.skeleton);
+    const rv=r.vars||{};VARS.forEach(([k,,type,opts])=>{if(rv[k]==null||rv[k]==='')return;let x=rv[k];if(type==='number'){x=Math.round(Number(x));if(!isFinite(x)||x<0)return}else if(type==='select'){x=String(x);if(!opts.includes(x))return}else x=String(x);v[k]=x});
+    S.genInputs=false;markSave();renderRail();render();
+    const bad=varHints(v).filter(h=>h.lvl==='error').length;toast(bad?`已生成，但有 ${bad} 处变量冲突，看红色提示手动改一下`:'已生成，检查一下再确认输入');
+  }catch(e){S.genInputs=false;render();const o=$('#genOut');if(o)o.innerHTML=`<div class="status bad">没能完成：${esc(e.code||'')} ${esc(e.message||'')}</div>`;if(e.code==='not_granted')S.sample=null}
 }
 async function askSkeleton(){
   if(!S.sample)return;const out=$('#askOut');const I=S.P.inputs;out.innerHTML='<div class="status">AI 正在读你的骨架…</div>';
