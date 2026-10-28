@@ -56,6 +56,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .prog{height:3px;background:var(--line);margin:0 8px}
 .prog i{display:block;height:100%;background:var(--accent);transition:width .3s}
 .pages{display:flex;gap:2px;overflow-x:auto;padding:4px 0 6px;scrollbar-width:thin}
+.grp{display:flex;flex-direction:column;flex:1 0 auto;border-left:1px solid var(--line)}.grp:first-child{border-left:0}
+.grp .gt{font-size:10.5px;color:var(--muted);padding:2px 10px 0;white-space:nowrap}
+.gpg{display:flex;gap:2px}
 .pg{flex:1 0 auto;min-width:92px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:7px;align-items:center;border:0;border-top:2px solid transparent;background:none;padding:7px 10px 6px;border-radius:0 0 6px 6px;cursor:pointer;text-align:left;color:var(--muted)}
 .pg:hover{background:var(--soft)}
 .pg.on{color:var(--ink);border-top-color:var(--accent);background:var(--panel2)}
@@ -133,9 +136,13 @@ summary{cursor:pointer;font-weight:600;font-size:13px}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr));gap:12px;margin-bottom:10px}
 .ccard{display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
 .ccard .pt{display:flex;flex-direction:column;gap:6px;align-items:center}
-.ccard img{width:200px;height:267px;object-fit:cover;object-position:top;border-radius:8px;border:1px solid var(--line);cursor:zoom-in}
+.ccard img{width:200px;height:267px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid var(--line);cursor:zoom-in}
 .ccard .ph{width:200px;height:267px;border-radius:8px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:var(--muted)}
-.ccard .up{font-size:12px;padding:4px 8px}
+.ccard .up,.mcard .up{font-size:12px;padding:4px 8px}
+.mcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:12px;margin-bottom:14px}
+.mcard{display:flex;flex-direction:column;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.mcard img,.mcard .ph{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.mcard img{cursor:zoom-in}.mcard .ph{background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700}
 @media (max-width:600px){.ccard{grid-template-columns:minmax(0,1fr)}.ccard img,.ccard .ph{width:100%;height:auto;aspect-ratio:3/4}}
 .lightbox{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
 .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
@@ -313,12 +320,12 @@ const SKELETON_TEMPLATE=`主角是____（身份），因为____（动机）来�
 const GUIDES={
   1:{what:'AI 把你的 idea 和骨架扩成一张"世界设定表"：有哪些地点、哪些势力、这个世界的规则是什么、核心冲突是什么。',check:['地点有没有覆盖你在变量里要的区域类型','势力的立场和骨架一致吗，有没有凭空多出来的大反派','不喜欢的名字直接在下面的 JSON 里改，改完点"应用"']},
   2:{what:'AI 给主角和每个 NPC 写一张"角色卡"：身份、住在哪、性格、怎么说话（附两句例句）、在游戏里负责什么。后面所有台词都以这张卡为准。',check:['骨架里出现的人物都在吗','例句读出来像两个不同的人吗，说话风格要有区别','谁发任务（quest_giver）、谁是商人、谁是反派标清楚了吗']},
-  3:{what:'AI 为每个角色做形象设计：轮廓、面部、服装、配色、标志性物件，以及生图 prompt。在"设置"里填了图片模型后，点卡片上的"生成立绘"直接出图；也可以拿 prompt 去 Midjourney / 即梦生成再上传。',check:['主角和反派一眼能分开吗','同一势力的角色有没有共享的配色或纹样','风格指南和你定的美术风格一致吗','生成的立绘不满意就改 prompt 再生成一次，旧图会被替换']},
+  3:{what:'AI 为每个角色做形象设计：轮廓、面部、服装、配色、标志性物件，以及生图 prompt。在"设置"里填了图片模型后，点卡片上的"生成三视图"直接出图（单个角色正面、侧面、背面，纯白背景）；也可以拿 prompt 去 Midjourney / 即梦生成再上传。',check:['主角和反派一眼能分开吗','同一势力的角色有没有共享的配色或纹样','风格指南和你定的美术风格一致吗','生成的立绘不满意就改 prompt 再生成一次，旧图会被替换']},
   4:{what:'AI 把骨架切成章节和"事件"，每个事件是一件推动剧情的事（起因、经过、结果、谁在场、在哪发生）。后面每个任务都来自一个事件。',check:['事件顺序和你的骨架一致吗','主线事件数等于你定的主线任务数吗','标了分支的事件，是不是你真的想让玩家做选择的地方']},
   5:{what:'AI 生成"打怪升级"的规则数据：职业和技能树、技能、物品和装备、敌人和敌群、状态效果、商店、成长曲线。它只给基础值和倍率，每一级的具体数字由程序算。',check:['技能名字有没有重复或太像','武器从低到高（tier 1、2、3）是不是越来越强','每章末尾有没有一个 boss','敌人弱点分布均匀吗，别全是同一种属性']},
   6:{what:'AI 把每个事件变成一条可执行的任务记录：谁发布、在哪接、分几步做什么（打谁 / 找什么 / 和谁说话 / 去哪）、交给谁、奖励什么、完成后记下什么标记（flag）。',check:['每个任务都有发布人、地点、分步目标、奖励吗','主线任务能通过 next_quest_id 串成一条链吗','奖励的武器有没有随章节变强','想改某一行，直接点表格里的格子']},
   7:{what:'AI 为每个任务写接取和交付两段对白，并给出选项。台词必须符合角色卡的说话风格。这一页按 NPC 分页，可以只重生成一个 NPC 的台词；.yarn 源文本由节点自动生成。',check:['读起来像那个人说的话吗（切到该 NPC 的分页逐段看）','两个选项是真的不同，还是换了个说法','交付对白有没有按结果分开（比如救到人和没救到）','不满意的句子直接点着改，重生成时会保留']},
-  8:{what:'AI 把地点变成地图（几张、多大、怎么连通），把 NPC、敌群、宝箱、传送点放到地图上，并列出场景美术需求。',check:['每个 NPC 都放在某张地图上了吗','任务要打的敌群在对的地图上吗','地图之间能走通吗，解锁条件合理吗']},
+  8:{what:'AI 把地点变成地图（几张、多大、怎么连通），把 NPC、敌群、宝箱、传送点放到地图上，并列出场景美术需求；配置了图片模型就能直接给每张地图生成场景图。地图线只依赖基础（0-2），剧情线没做完也能先出图。',check:['每个 NPC 都放在某张地图上了吗','任务要打的敌群在对的地图上吗','地图之间能走通吗，解锁条件合理吗']},
   9:{what:'程序自动做四道检查：结构（每张表该有的字段和数量）、引用（id 和 flag 是否都存在）、数值（按成长曲线自动把所有任务打一遍）、AI 一致性（人物、地点、台词风格）。问题按环节和类型分组，点"去这一行"直接跳到出问题的那一行。',check:['红色错误必须清零才能通过，也才能导出内容包','战斗模拟"战败"的任务，回环节 5 降低敌人倍率或加奖励经验','警告可以先放着，但建议看一眼']},
   10:{what:'把所有表打包：在页面里文本试玩一遍（NPC 话题菜单、分步目标、战斗、结局、对话框里带立绘），或者导出内容包 zip 交给程序装进 Godot / RPG Maker。',check:['试玩时注意对白顺序、选项效果、战斗难度、结局是否按 flag 分开','导出前确认环节 9 已通过']},
 };
@@ -377,7 +384,11 @@ async function newProject(){
 }
 function setStatus(n,st){S.P.statuses[String(n)]=st;markSave()}
 const stOf=n=>S.P?.statuses?.[String(n)]||'';
-const unlocked=n=>n===0||stOf(n-1)==='done'||stOf(n)||n===9||n===10;
+// 三条线：0-2 是共用的基础；剧情线 4→5→6→7，人物线 3，地图线 8 都只依赖基础，可以各自先出结果
+const DEPS={1:[0],2:[1],3:[2],4:[2],5:[4],6:[5],7:[6],8:[2]};
+const LINES=[{t:'基础',ns:[0,1,2]},{t:'剧情线',r:'文本试玩',ns:[4,5,6,7]},{t:'人物线',r:'三视图',ns:[3]},{t:'地图线',r:'场景图',ns:[8]},{t:'汇总',ns:[9,10]}];
+const unlocked=n=>n===0||n===9||n===10||!!stOf(n)||(DEPS[n]||[]).every(d=>stOf(d)==='done');
+const depsLeft=n=>(DEPS[n]||[]).filter(d=>stOf(d)!=='done');
 
 /* ---------- formulas (shared by simulation and play) ---------- */
 function curve(){return Object.assign({},CURVE_DEFAULT,(S.stages[5]?.data?.curve)||{})}
@@ -411,7 +422,7 @@ function promptFor(n,opts={}){
 输出格式：
 {"hero":{"name":"","identity":"","motive":"","appearance":""},"npcs":[{"id":"npc_x","name":"","identity":"","location":"loc_x","faction":"fac_x 或空","personality":"","speech_style":"","examples":["",""],"relation":"与主角的关系","function":"quest_giver","appear_condition":"默认出现 或 某 flag","appearance":"给美术的外观描述"}]}`;
   if(n===3)return `${head}
-任务：为主角和每个 NPC 做人物形象设计，并给出全局风格指南。美术风格：${v.art_style}；队伍规模 ${v.party}。形象要从人物的身份、性格、势力和世界观里长出来（personality_cues 说明性格怎么体现在外观上），同一势力的角色共享配色或纹样，主角和反派的轮廓要一眼区分。colors 用十六进制色值。portrait_prompt_en 是给 Midjourney / Stable Diffusion / 即梦 等生图工具的英文提示词（含风格、景别、背景、光线），portrait_prompt_zh 是同义中文版；negative_prompt 列出要避免的内容。walk_sprite 给行走图的素材包来源建议和特征描述，不生成像素图。expressions 给 4 个对白用的表情名。
+任务：为主角和每个 NPC 做人物形象设计，并给出全局风格指南。美术风格：${v.art_style}；队伍规模 ${v.party}。形象要从人物的身份、性格、势力和世界观里长出来（personality_cues 说明性格怎么体现在外观上），同一势力的角色共享配色或纹样，主角和反派的轮廓要一眼区分。colors 用十六进制色值。portrait_prompt_en 是给 Midjourney / Stable Diffusion / 即梦 等生图工具的英文提示词：只画这一个角色的设定三视图（character turnaround sheet：同一角色的正面、侧面、背面全身像并排站立），纯白背景，不要场景、不要环境道具、不要其他人物、不要文字标注；写清风格、服装细节、配色和光线。portrait_prompt_zh 是同义中文版；negative_prompt 列出要避免的内容（必须包含背景场景、多个角色、文字）。walk_sprite 给行走图的素材包来源建议和特征描述，不生成像素图。expressions 给 4 个对白用的表情名。
 【世界设定】${trimJson({title:T.world.title,factions:T.world.factions,rules:T.world.rules,conflict:T.world.conflict},8000)}
 【主角】${trimJson(T.hero)}
 【NPC】${trimJson(T.npcs.map(x=>({id:x.id,name:x.name,identity:x.identity,faction:x.faction,personality:x.personality,function:x.function,appearance:x.appearance})))}
@@ -449,7 +460,7 @@ function promptFor(n,opts={}){
 输出格式：
 {"dialogs":[{"id":"d_q_1_01_accept","quest_id":"q_1_01","stage":"accept","nodes":[{"node_id":"n1","speaker":"","text":"","condition":null,"options":[{"text":"","next":"n2","effects":[{"type":"accept_quest"}]},{"text":"","next":"n3","effects":[{"type":"accept_quest"},{"type":"set_flag","flag":"attitude_x","value":true}]}]},{"node_id":"n2","speaker":"","text":"","condition":null,"options":[{"text":"继续","next":null,"effects":[]}]}]}]}`}
   if(n===8)return `${head}
-任务：生成地图表、事件表和场景美术需求单。地图 ${v.map_count} 张，类型覆盖：${v.map_types}；每张地图 size 用 "宽x高" 格子数（村庄 30x20 左右，地牢更长）；layout 用文字描述分区；connections 列出相连地图及解锁条件。事件表把 NPC 放到其 location 对应的地图，把 troops 放到任务发生的地图，加上宝箱（给物品 id）、传送点和任务触发器。美术需求单只列场景类单张图：每张地图一张背景、每个 boss 一张形象图（角色立绘已在环节 3 设计，不要重复）；行走图和图块写 asset_pack 来源建议而不是生成。美术风格：${v.art_style}${T.design.style_guide?'，风格指南：'+trimJson(T.design.style_guide,2000):''}。
+任务：生成地图表、事件表和场景美术需求单。地图 ${v.map_count} 张，类型覆盖：${v.map_types}；每张地图 size 用 "宽x高" 格子数（村庄 30x20 左右，地牢更长）；layout 用文字描述分区；connections 列出相连地图及解锁条件。事件表把 NPC 放到其 location 对应的地图，把 troops 放到任务发生的地图，加上宝箱（给物品 id）、传送点和任务触发器。${T.quests.length?'':'剧情线还没做完（没有任务表）：事件表只放 NPC 和传送点，不放敌群、宝箱和任务触发器，等剧情线完成后再重新生成补上。'}美术需求单只列场景类单张图：每张地图一张背景、每个 boss 一张形象图（角色立绘已在环节 3 设计，不要重复）；行走图和图块写 asset_pack 来源建议而不是生成。美术风格：${v.art_style}${T.design.style_guide?'，风格指南：'+trimJson(T.design.style_guide,2000):''}。
 【地点】${trimJson(T.world.locations)}
 【NPC】${trimJson(T.npcs.map(x=>({id:x.id,name:x.name,location:x.location,function:x.function,appearance:x.appearance})))}
 【任务】${trimJson(T.quests.map(q=>({id:q.id,location_id:q.location_id,troop_id:q.troop_id,giver_npc:q.giver_npc})))}
@@ -538,6 +549,7 @@ async function runStage(n,opts={}){
     if(n===9){S.stages[9]=Object.assign({},S.stages[9]||{},{ai:Array.isArray(data.issues)?data.issues:[],aiAt:Date.now(),aiMs:Date.now()-t0});setStatus(9,stOf(9)==='done'?'done':'')}
     else{
       const old=S.stages[n]?.data;let newData=data;
+      if(n===8&&old?.maps){(newData.maps||[]).forEach(m=>{const o=old.maps.find(x=>x.id===m.id);if(o&&(o.image_id||o.image_url)){m.image_id=o.image_id;m.image_url=o.image_url}})}
       if(n===3&&old?.characters){(newData.characters||[]).forEach(c=>{const o=old.characters.find(x=>x.id===c.id);if(o&&o.portrait_id)c.portrait_id=o.portrait_id})}
       if(n===7&&opts.quests&&old){const sub=new Set(opts.quests.map(q=>q.id));newData=Object.assign({},old,{dialogs:[...(old.dialogs||[]).filter(d=>!sub.has(d.quest_id)),...(data.dialogs||[])]})}
       const kept=old?mergeKeep(n,old,newData):0;
@@ -640,7 +652,7 @@ function renderRail(){
   document.querySelectorAll('[data-undel]').forEach(b=>b.onclick=()=>{S.confirmDel=null;renderRail()});
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteProject(b.dataset.del));
   const done=S.P?doneCount(S.P):0;
-  $('#steps').innerHTML=`<div class="prog"><i style="width:${Math.round(done/STAGES.length*100)}%"></i></div><div class="pages">`+STAGES.map(s=>{const st=S.P?stOf(s.n):'';const lock=S.P&&!unlocked(s.n);const label={done:'已通过',ok:'待审核',run:'生成中',fix:'需修改'}[st]||(lock?'未解锁':(s.ai?'AI 生成':''));return `<button class="pg ${S.cur===s.n&&!S.play?'on':''} ${st} ${lock?'locked':''}" data-n="${s.n}" title="${esc(s.out)}"><span class="num">${st==='done'?'✓':s.n}</span><span class="nm">${esc(s.name)}</span><span class="lb">${label}</span></button>`}).join('')+`</div>`;
+  $('#steps').innerHTML=`<div class="prog"><i style="width:${Math.round(done/STAGES.length*100)}%"></i></div><div class="pages">`+LINES.map(L=>`<div class="grp"><div class="gt">${esc(L.t)}${L.r?' · 结果：'+esc(L.r):''}</div><div class="gpg">`+L.ns.map(n=>STAGES[n]).map(s=>{const st=S.P?stOf(s.n):'';const lock=S.P&&!unlocked(s.n);const label={done:'已通过',ok:'待审核',run:'生成中',fix:'需修改'}[st]||(lock?'未解锁':(s.ai?'AI 生成':''));return `<button class="pg ${S.cur===s.n&&!S.play?'on':''} ${st} ${lock?'locked':''}" data-n="${s.n}" title="${esc(s.out)}"><span class="num">${st==='done'?'✓':s.n}</span><span class="nm">${esc(s.name)}</span><span class="lb">${label}</span></button>`}).join('')+`</div></div>`).join('')+`</div>`;
   document.querySelectorAll('.pg').forEach(b=>b.onclick=()=>{if(!S.P)return;S.cur=Number(b.dataset.n);S.play=null;S.hl=null;render();const on=$('.pg.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'nearest'})});
 }
 async function deleteProject(pid){
@@ -748,12 +760,13 @@ function renderAIStage(n){
   const s=STAGES[n],st=S.stages[n]||{},status=stOf(n),running=S.running===n;
   const prevOk=unlocked(n);
   const iss=st.data&&!running?stageIssues(n):[];const errs=iss.filter(i=>i.severity==='error').length;
-  $('#work').innerHTML=`<h2>${n} · ${esc(s.name)}</h2><p class="lead">产出：${esc(s.out)}。${prevOk?'':'上一环节还没有通过审核，先完成前面的环节。'}</p>
+  $('#work').innerHTML=`<h2>${n} · ${esc(s.name)}</h2><p class="lead">产出：${esc(s.out)}。${prevOk?'':'要先通过：'+depsLeft(n).map(d=>d+' '+STAGES[d].name).join('、')+'。'}</p>
   ${guideBox(n)}
   <div class="row" style="margin-bottom:8px">
     <button class="btn primary" id="btnRun" ${!prevOk||running||!S.sample?'disabled':''}>${st.data?'重新生成（保留人改过的行）':'用 AI 生成'}</button>
     ${running?'<button class="btn" id="btnStop">停止</button>':''}
     ${st.data&&!running?`<button class="btn ${status==='done'?'':'primary'}" id="btnApprove" ${errs&&status!=='done'?'disabled':''} title="${errs?'先把下面的错误清零':''}">${status==='done'?'已通过 · 取消通过':errs?`还有 ${errs} 个错误，不能通过`:'审核通过，解锁下一环节'}</button>`:''}
+    ${n===7&&st.data&&!running?'<button class="btn" id="btnPlayLine">▶ 试玩剧情线</button>':''}
     <details style="margin:0"><summary>查看这一步的 prompt</summary><div class="stream" style="margin-top:6px;max-height:300px">${esc(promptFor(n))}</div></details>
   </div>
   <div class="meta" id="metaLine">${metaHtml(n)}</div>
@@ -769,6 +782,9 @@ function renderAIStage(n){
   document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{const t=b.dataset.copy;try{await navigator.clipboard.writeText(t);toast('已复制')}catch(e){toast('复制失败，请手动选择文字')}});
   document.querySelectorAll('[data-gen]').forEach(b=>b.onclick=()=>genPortrait(b.dataset.gen));
   const ga=$('#btnGenAll');if(ga)ga.onclick=genAllPortraits;
+  document.querySelectorAll('[data-genmap]').forEach(b=>b.onclick=()=>genMapArt(b.dataset.genmap));
+  const gm=$('#btnGenMaps');if(gm)gm.onclick=genAllMaps;
+  const pl=$('#btnPlayLine');if(pl)pl.onclick=startPlay;
   document.querySelectorAll('[data-upload]').forEach(inp=>inp.onchange=async()=>{const f=inp.files&&inp.files[0];if(!f)return;
     try{const id=await storeBlob(f);const ch=(S.stages[3].data.characters||[]).find(c=>c.id===inp.dataset.upload);if(ch){ch.portrait_id=id;delete ch.portrait_url;await saveStage(3);toast('立绘已保存');render()}}catch(e){toast('上传失败：'+(e.code||e.message||''))}});
   const apply=$('#btnApply');if(apply)apply.onclick=async()=>{try{const d=JSON.parse($('#jsonEdit').value);if(typeof d!=='object'||Array.isArray(d))throw new Error('顶层必须是对象');const changed=diffEdits(n,st.data,d);const meta=stMeta(n);S.stages[n]={data:d,raw:st.raw||'',updatedAt:Date.now(),meta};const e2=schemaCheck(n,d).filter(i=>i.severity==='error').length;setStatus(n,e2?'fix':'ok');await saveStage(n);toast(changed?`已应用，记住了 ${changed} 行改动`:'已应用');render()}catch(e){$('#jsonMsg').textContent='JSON 无效：'+e.message}};
@@ -793,7 +809,7 @@ function table(arr,o={}){
 }
 function renderData(n,data){
   const keys=Object.keys(data);const arrays=keys.filter(k=>Array.isArray(data[k]));const others=keys.filter(k=>!Array.isArray(data[k]));
-  let html='';
+  let html=n===8?renderMapArt(data):'';
   if(n===3)return renderDesign(data);
   if(n===7)return renderDialogs(data);
   if(others.length)html+=`<div class="kv">${others.map(k=>`<b>${esc(k)}</b><div>${typeof data[k]==='object'?`<span class="mono">${esc(JSON.stringify(data[k]))}</span>`:esc(data[k])}</div>`).join('')}</div>`;
@@ -852,8 +868,8 @@ const sw=c=>isHex(c)?`<i class="sw" style="background:${c}" title="${esc(c)}"></
 function renderDesign(d){
   const g=d.style_guide||{};const chars=d.characters||[];
   let html=`<div class="card"><h3 style="margin-top:0">风格指南</h3><div class="kv"><b>画风</b><div>${esc(g.art_style||'')}</div><b>头身比</b><div>${esc(g.proportion||'')}</div><b>线条与上色</b><div>${esc(g.line_and_shading||'')}</div><b>主色板</b><div class="swatches">${(g.palette||[]).map(sw).join('')}</div>${(g.faction_motifs||[]).length?`<b>势力纹样</b><div>${g.faction_motifs.map(m=>esc(m.faction)+'：'+esc(m.motif)).join('；')}</div>`:''}${g.notes?`<b>备注</b><div>${esc(g.notes)}</div>`:''}</div></div>`;
-  html+=`<div class="row" style="margin:14px 0 6px"><h3 style="margin:0">角色形象卡（${chars.length}）</h3>${imgReady()&&chars.length?`<button class="btn" id="btnGenAll" ${S.genImg.size?'disabled':''}>${S.genImg.size?`生成中 ${S.genImg.size} 张…`:`为还没有立绘的角色生成（${chars.filter(c=>!portraitUrl(c)).length} 张）`}</button>`:''}</div><div class="cards">`+chars.map(c=>{const url=portraitUrl(c);const busy=S.genImg.has(c.id);return `<div class="ccard" data-cid="${esc(c.id)}">
-    <div class="pt">${url?`<img src="${esc(url)}" alt="${esc(c.name)} 立绘">`:`<div class="ph">${esc((c.name||'?').slice(0,1))}</div>`}<div class="swatches">${sw(c.colors?.main)}${sw(c.colors?.secondary)}${sw(c.colors?.accent)}</div>${imgReady()?`<button class="btn ghost up" data-gen="${esc(c.id)}" ${busy?'disabled':''}>${busy?'生成中…':url?'重新生成':'生成立绘'}</button>`:''}${S.imgErr&&S.imgErr[c.id]&&!busy?`<span class="status bad" style="font-size:11px;margin:4px 0;word-break:break-all">失败：${esc(S.imgErr[c.id])}</span>`:''}<label class="btn ghost up">${url?'换一张':'上传立绘'}<input type="file" accept="image/*" data-upload="${esc(c.id)}" hidden></label>${c.portrait_url&&!c.portrait_id?'<span class="hint" style="font-size:10.5px;text-align:center">临时链接，会过期</span>':''}</div>
+  html+=`<div class="row" style="margin:14px 0 6px"><h3 style="margin:0">角色形象卡（${chars.length}）</h3>${imgReady()&&chars.length?`<button class="btn" id="btnGenAll" ${S.genImg.size?'disabled':''}>${S.genImg.size?`生成中 ${S.genImg.size} 张…`:`为还没有三视图的角色生成（${chars.filter(c=>!portraitUrl(c)).length} 张）`}</button>`:''}</div><div class="cards">`+chars.map(c=>{const url=portraitUrl(c);const busy=S.genImg.has(c.id);return `<div class="ccard" data-cid="${esc(c.id)}">
+    <div class="pt">${url?`<img src="${esc(url)}" alt="${esc(c.name)} 立绘">`:`<div class="ph">${esc((c.name||'?').slice(0,1))}</div>`}<div class="swatches">${sw(c.colors?.main)}${sw(c.colors?.secondary)}${sw(c.colors?.accent)}</div>${imgReady()?`<button class="btn ghost up" data-gen="${esc(c.id)}" ${busy?'disabled':''}>${busy?'生成中…':url?'重新生成':'生成三视图'}</button>`:''}${S.imgErr&&S.imgErr[c.id]&&!busy?`<span class="status bad" style="font-size:11px;margin:4px 0;word-break:break-all">失败：${esc(S.imgErr[c.id])}</span>`:''}<label class="btn ghost up">${url?'换一张':'上传立绘'}<input type="file" accept="image/*" data-upload="${esc(c.id)}" hidden></label>${c.portrait_url&&!c.portrait_id?'<span class="hint" style="font-size:10.5px;text-align:center">临时链接，会过期</span>':''}</div>
     <div class="cbody"><div class="cn">${esc(c.name)} <span class="hint">${esc(c.role||'')} · <span class="mono">${esc(c.id)}</span></span></div>
     <div class="kv small"><b>轮廓</b><div>${esc(c.silhouette||'')}</div><b>面部</b><div>${esc(c.face||'')}</div><b>服装</b><div>${esc(c.outfit||'')}</div><b>标志物</b><div>${esc(c.signature_item||'')}</div><b>性格外化</b><div>${esc(c.personality_cues||'')}</div><b>表情</b><div>${(c.expressions||[]).map(esc).join('、')}</div><b>行走图</b><div>${esc(c.walk_sprite?.source||'')}${c.walk_sprite?.base?'：'+esc(c.walk_sprite.base):''}</div></div>
     <details><summary>生图 prompt</summary><div class="prompt">${esc(c.portrait_prompt_en||'')}</div><div class="row" style="margin:4px 0 8px"><button class="btn ghost" data-copy="${esc(c.portrait_prompt_en||'')}">复制英文</button><button class="btn ghost" data-copy="${esc(c.portrait_prompt_zh||'')}">复制中文</button></div><div class="hint">中文：${esc(c.portrait_prompt_zh||'')}</div>${c.negative_prompt?`<div class="hint">避免：${esc(c.negative_prompt)}</div>`:''}</details></div></div>`}).join('')+`</div>`;
@@ -922,7 +938,9 @@ async function buildZip(){
   z.file('art/art_requests.md',artMd());
   const {all}=collectIssues();z.file('issues.json',JSON.stringify(all,null,2));z.file('issues.md',issuesMd(all));
   z.file('bundle.json',JSON.stringify(bundle(),null,2));z.file('inputs.json',JSON.stringify(S.P.inputs,null,2));
-  z.file('README.md',readmeMd(genStats()+(portraits?`\n- 立绘：已打包 ${portraits} 张`:'')));
+  let mapImgs=0;
+  for(const m of (S.stages[8]?.data?.maps||[])){const u=mapUrl(m);if(!u)continue;try{const r=await fetch(u);if(r.ok){const b=await r.blob();z.file(`art/maps/${m.id}.${(b.type.split('/')[1]||'png').replace('jpeg','jpg')}`,b);mapImgs++}}catch(e){console.warn(e)}}
+  z.file('README.md',readmeMd(genStats()+(portraits?`\n- 立绘：已打包 ${portraits} 张`:'')+(mapImgs?`\n- 地图场景图：已打包 ${mapImgs} 张（art/maps/）`:'')));
   return z.generateAsync({type:'blob',compression:'DEFLATE'});
 }
 async function exportZip(){
@@ -1120,12 +1138,12 @@ function applyCfg(){const c=cfgGet();const mode=c.text.mode==='auto'?(S.claudeSa
 const imgReady=()=>{const c=cfgGet();return c.img.mode==='backend'||(c.img.mode==='direct'&&!!(c.img.base&&c.img.key))};
 const b64ToBlob=(b64,mime)=>{const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime||'image/png'})};
 // Seedream 4.5 及以上的最小尺寸是 2K，1024x1024 会被拒；档位写法（1K/2K/4K）原样传
-function imgSize(im){const s=String(im.size||'1024x1024').trim();const m=s.match(/^(\d+)\s*[x*×]\s*(\d+)$/i);if(m&&/seedream/i.test(im.model)&&m[1]*m[2]<2560*1440)return '2K';return s}
-async function genImage(prompt){const c=cfgGet();const im=c.img;
+function imgSize(im,o={}){if(o.wide&&/seedream/i.test(im.model))return '2560x1440';const s=String(im.size||'1024x1024').trim();const m=s.match(/^(\d+)\s*[x*×]\s*(\d+)$/i);if(m&&/seedream/i.test(im.model)&&m[1]*m[2]<2560*1440)return '2K';return s}
+async function genImage(prompt,o={}){const c=cfgGet();const im=c.img;
   if(im.mode==='backend'){const b=c.backend;const r=await fetch(beBase(b)+'/api/image',{method:'POST',headers:apiHeaders(b,true),body:JSON.stringify({prompt,size:im.size||'1024x1024'})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('后端返回 '+r.status));if(j.b64)return b64ToBlob(j.b64,j.mime);if(j.url)return {url:j.url};throw new Error('后端没有返回图片')}
   if(im.mode!=='direct')throw new Error('还没有配置图片模型，点右上角"⚙ 设置"');
   const ark=/volces\.com/.test(im.base);
-  const call=async(withFmt)=>{const body={model:im.model,prompt,n:1,size:imgSize(im)};if(ark)body.watermark=false;if(withFmt)body.response_format='b64_json';return fetch(im.base.replace(/\/$/,'')+'/images/generations',{method:'POST',headers:llmHeaders(im),body:JSON.stringify(body)})};
+  const call=async(withFmt)=>{const body={model:im.model,prompt,n:1,size:imgSize(im,o)};if(ark)body.watermark=false;if(withFmt)body.response_format='b64_json';return fetch(im.base.replace(/\/$/,'')+'/images/generations',{method:'POST',headers:llmHeaders(im),body:JSON.stringify(body)})};
   let r;try{r=await call(true);if(r.status===400){const t=await r.clone().text();if(/response_format/i.test(t))r=await call(false)}}catch(e){throw new Error('连不上 '+im.base+'：'+e.message+'。'+(ark?'火山方舟出错时不带跨域头，浏览器只能看到这句：请检查 key、模型名（要用开通了的 Endpoint 或模型 ID）和尺寸（Seedream 填 2K）。':'可能是接口不允许浏览器直连，改用后端模式。'))}
   if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(`接口返回 ${r.status}：${t.slice(0,200)}`)}
   const j=await r.json();const d=(j.data&&j.data[0])||(j.images&&j.images[0])||{};
@@ -1136,13 +1154,29 @@ async function storeBlob(blob){if(S.assets){const r=await S.assets.upload(blob);
 async function genPortrait(cid){const d=S.stages[3]?.data;const ch=(d?.characters||[]).find(c=>c.id===cid);if(!ch)return;
   const prompt=(ch.portrait_prompt_en||ch.portrait_prompt_zh||'').trim();if(!prompt){toast(ch.name+' 没有生图 prompt');return}
   S.genImg.add(cid);S.imgErr=S.imgErr||{};delete S.imgErr[cid];render();
-  try{const out=await genImage(prompt+(ch.negative_prompt?'. Avoid: '+ch.negative_prompt:''));
+  const sheet='. Single character turnaround sheet: the same character shown full body in front view, side view and back view, standing side by side. Plain pure white background, no scenery, no props in the background, no other characters, no text or labels.';
+  try{const out=await genImage(prompt+sheet+' Avoid: background scenery, multiple different characters, text'+(ch.negative_prompt?', '+ch.negative_prompt:''));
     if(out instanceof Blob){ch.portrait_id=await storeBlob(out);delete ch.portrait_url}else{ch.portrait_url=out.url;delete ch.portrait_id}
     const m=stMeta(3);m.imgRuns=(m.imgRuns||0)+1;await saveStage(3);toast(ch.name+' 的立绘已生成')}
   catch(e){const msg=String(e.message||e);S.imgErr[cid]=msg;toast(ch.name+' 生成失败，原因写在卡片上')}
   S.genImg.delete(cid);render()}
-document.addEventListener('click',e=>{const im=e.target.closest&&e.target.closest('.ccard .pt img');if(!im)return;const lb=document.createElement('div');lb.className='lightbox';lb.innerHTML=`<img src="${esc(im.src)}" alt="${esc(im.alt)}">`;lb.onclick=()=>lb.remove();document.body.appendChild(lb)});
+document.addEventListener('click',e=>{const im=e.target.closest&&e.target.closest('.ccard .pt img,.mcard img');if(!im)return;const lb=document.createElement('div');lb.className='lightbox';lb.innerHTML=`<img src="${esc(im.src)}" alt="${esc(im.alt)}">`;lb.onclick=()=>lb.remove();document.body.appendChild(lb)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.lightbox').forEach(x=>x.remove())});
+const mapUrl=m=>m?(m.image_id?blobUrl(m.image_id):(m.image_url||null)):null;
+function mapArtPrompt(m,d){const v=S.P.inputs.vars;const g=tables().design.style_guide||{};const art=(d.art||[]).find(a=>a.target===m.id);
+  return `${v.art_style}${g.art_style?'，'+g.art_style:''}。RPG 游戏场景背景图：${m.name||m.id}（${m.type||''}）。${art&&art.desc?art.desc:(m.layout||'')}${art&&art.style?'。'+art.style:''}。横版宽幅构图，只有场景，没有人物，没有文字和 UI。`}
+function renderMapArt(d){const maps=d.maps||[];if(!maps.length)return '';
+  return `<div class="row" style="margin:4px 0 6px"><h3 style="margin:0">地图场景图（${maps.length}）</h3>${imgReady()?`<button class="btn" id="btnGenMaps" ${S.genImg.size?'disabled':''}>${S.genImg.size?`生成中 ${S.genImg.size} 张…`:`为还没有场景图的地图生成（${maps.filter(m=>!mapUrl(m)).length} 张）`}</button>`:''}</div>
+  ${imgReady()?'':'<p class="hint">在右上角"⚙ 设置"里配置图片模型后，可以在这里直接生成每张地图的场景图。</p>'}<div class="mcards">`+maps.map(m=>{const url=mapUrl(m);const key='map:'+m.id;const busy=S.genImg.has(key);const err=S.imgErr&&S.imgErr[key];
+    return `<div class="mcard">${url?`<img src="${esc(url)}" alt="${esc(m.name)} 场景图">`:`<div class="ph">${esc(m.name||m.id)}</div>`}<div class="row" style="justify-content:space-between"><b>${esc(m.name||m.id)} <span class="hint">${esc(m.type||'')} · <span class="mono">${esc(m.id)}</span></span></b>${imgReady()?`<button class="btn ghost up" data-genmap="${esc(m.id)}" ${busy?'disabled':''}>${busy?'生成中…':url?'重新生成':'生成场景图'}</button>`:''}</div>${err&&!busy?`<span class="status bad" style="font-size:11px;margin:0;word-break:break-all">失败：${esc(err)}</span>`:''}<details><summary class="hint">生图 prompt</summary><div class="hint">${esc(mapArtPrompt(m,d))}</div></details></div>`}).join('')+`</div>`}
+async function genMapArt(mid){const d=S.stages[8]?.data;const m=(d?.maps||[]).find(x=>x.id===mid);if(!m)return;const key='map:'+mid;
+  S.genImg.add(key);S.imgErr=S.imgErr||{};delete S.imgErr[key];render();
+  try{const out=await genImage(mapArtPrompt(m,d)+' 避免：人物、文字、UI、水印',{wide:true});
+    if(out instanceof Blob){m.image_id=await storeBlob(out);delete m.image_url}else{m.image_url=out.url;delete m.image_id}
+    const mt=stMeta(8);mt.imgRuns=(mt.imgRuns||0)+1;await saveStage(8);toast((m.name||m.id)+' 的场景图已生成')}
+  catch(e){S.imgErr[key]=String(e.message||e);toast((m.name||m.id)+' 生成失败，原因写在卡片上')}
+  S.genImg.delete(key);render()}
+async function genAllMaps(){const maps=(S.stages[8]?.data?.maps||[]).filter(m=>!mapUrl(m));for(const m of maps){if(S.cur!==8)break;await genMapArt(m.id)}}
 async function genAllPortraits(){const chars=(S.stages[3]?.data?.characters||[]).filter(c=>!portraitUrl(c));for(const c of chars){if(S.cur!==3)break;await genPortrait(c.id)}}
 /* settings sheet */
 function cfgUI(){
