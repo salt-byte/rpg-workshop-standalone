@@ -1,0 +1,13 @@
+{
+  "name": "rpg-workshop-standalone",
+  "version": "4.0.0",
+  "private": true,
+  "description": "RPG 工坊 独立版：一个 HTML 页面 + 一个转发模型请求的小后端",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

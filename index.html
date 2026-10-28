@@ -1,0 +1,1162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>RPG 工坊</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* Layout, DaVinci-style: a slim top bar, projects in a left rail, the work panel in the middle, and a horizontal page bar at the bottom that doubles as the 0–10 progress track. Dark-first. */
+:root{
+  --bg:#19191c; --panel:#222225; --panel2:#2a2a2e; --ink:#e9e6e1; --muted:#9a968f; --line:#36363b; --soft:#2f2f34;
+  --accent:#e2613c; --accent-ink:#ffffff; --accent-soft:#3d2a24;
+  --good:#6cc48f; --good-soft:#1f3328; --warn:#e3a94e; --warn-soft:#3a2f16; --bad:#ef6d63; --bad-soft:#3e2220;
+  --code:#1d1d20;
+  --font-ui:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){ :root:not([data-theme="dark"]){ --bg:#efede9; --panel:#ffffff; --panel2:#f6f4f0; --ink:#1f1d1b; --muted:#6f6a64; --line:#dcd8d1; --soft:#ebe8e2; --accent:#c04a2a; --accent-ink:#ffffff; --accent-soft:#f7e3dc; --good:#2f7a4e; --good-soft:#e2f1e7; --warn:#a86400; --warn-soft:#f8ecd6; --bad:#b4281f; --bad-soft:#f9e1de; --code:#f1efea; color-scheme:light } }
+:root[data-theme="light"]{ --bg:#efede9; --panel:#ffffff; --panel2:#f6f4f0; --ink:#1f1d1b; --muted:#6f6a64; --line:#dcd8d1; --soft:#ebe8e2; --accent:#c04a2a; --accent-ink:#ffffff; --accent-soft:#f7e3dc; --good:#2f7a4e; --good-soft:#e2f1e7; --warn:#a86400; --warn-soft:#f8ecd6; --bad:#b4281f; --bad-soft:#f9e1de; --code:#f1efea; color-scheme:light }
+
+html,body{height:100%}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:14px;line-height:1.55}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{display:grid;height:100%;min-height:100%;grid-template-columns:220px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"top top" "rail work" "track track"}
+/* top bar */
+.top{grid-area:top;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:8px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{font-weight:700;letter-spacing:.04em;font-size:13px;color:var(--muted);text-transform:uppercase}
+.top .ttl{text-align:center;font-weight:700;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top .actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap}
+.top .st{font-size:12px;color:var(--muted)}
+/* rail */
+.rail{grid-area:rail;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;padding:10px 8px 10px max(8px,env(safe-area-inset-left,0px))}
+.rail h4{margin:4px 8px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+#projList{flex:1;overflow:auto;min-height:0}
+.proj{display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px;width:100%;text-align:left;border:0;background:none;padding:7px 8px;border-radius:6px;cursor:pointer;color:var(--ink)}
+.proj.on{background:var(--soft)}
+.proj:hover{background:var(--soft)}
+.proj .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.proj .pr{font-size:11px;color:var(--muted);font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.proj .x{grid-column:2;grid-row:1/3;border:0;background:none;color:var(--muted);cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0}
+.proj:hover .x,.proj.on .x{opacity:1}
+.proj .x:hover{background:var(--bad-soft);color:var(--bad)}
+.confirm{display:flex;gap:6px;align-items:center;padding:6px 8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+/* work */
+.work{grid-area:work;min-width:0;overflow:auto;padding:18px max(16px,env(safe-area-inset-right,0px)) 40px 20px}
+.work>*{max-width:1100px}
+/* bottom page bar = progress track */
+.track{grid-area:track;background:var(--panel);border-top:1px solid var(--line);padding:0 max(8px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(8px,env(safe-area-inset-left,0px))}
+.prog{height:3px;background:var(--line);margin:0 8px}
+.prog i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.pages{display:flex;gap:2px;overflow-x:auto;padding:4px 0 6px;scrollbar-width:thin}
+.pg{flex:1 0 auto;min-width:92px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:7px;align-items:center;border:0;border-top:2px solid transparent;background:none;padding:7px 10px 6px;border-radius:0 0 6px 6px;cursor:pointer;text-align:left;color:var(--muted)}
+.pg:hover{background:var(--soft)}
+.pg.on{color:var(--ink);border-top-color:var(--accent);background:var(--panel2)}
+.pg .num{grid-row:1/3;font-family:var(--font-mono);font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--line)}
+.pg.on .num{border-color:var(--accent);color:var(--accent)}
+.pg.done .num{background:var(--good);border-color:var(--good);color:#0f1a13}
+.pg.ok .num{border-color:var(--accent);color:var(--accent)}
+.pg.run .num{border-color:var(--warn);color:var(--warn)}
+.pg.fix .num{border-color:var(--bad);color:var(--bad)}
+.pg.locked{opacity:.45}
+.pg .nm{font-size:12.5px;font-weight:600;white-space:nowrap}
+.pg .lb{font-size:10.5px;white-space:nowrap}
+.pg.done .lb{color:var(--good)}.pg.run .lb{color:var(--warn)}.pg.fix .lb{color:var(--bad)}.pg.ok .lb{color:var(--accent)}
+.pg:focus-visible,.btn:focus-visible,.proj:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+h2{font-size:18px;margin:0 0 4px;text-wrap:balance}
+h3{font-size:14px;margin:18px 0 8px}
+.lead{color:var(--muted);margin:0 0 14px;max-width:70ch}
+.btn{border:1px solid var(--line);background:var(--panel2);padding:7px 12px;border-radius:7px;cursor:pointer;font-weight:600;font-size:13px}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:none}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+label.f{display:block;margin-bottom:10px}
+label.f span{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+input[type=text],input[type=number],select,textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:7px 9px}
+select.sm{width:auto;padding:3px 6px}
+textarea{min-height:90px;resize:vertical;line-height:1.5}
+textarea.json{font-family:var(--font-mono);font-size:12px;min-height:220px;white-space:pre;overflow:auto}
+.vars{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 14px}
+.hint{font-size:12px;color:var(--muted)}
+.status{font-size:12px;padding:8px 10px;border-radius:7px;background:var(--soft);margin:10px 0;white-space:pre-wrap}
+.status.bad{background:var(--bad-soft);color:var(--bad)}
+.status.good{background:var(--good-soft);color:var(--good)}
+.stream{font-family:var(--font-mono);font-size:12px;background:var(--code);border:1px solid var(--line);border-radius:7px;padding:10px;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.tbl{overflow-x:auto;margin:6px 0 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{border-bottom:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top;max-width:360px}
+th{background:var(--soft);font-weight:600;white-space:nowrap;position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td .mono,th .mono,.mono{font-family:var(--font-mono);font-size:11.5px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:13px;margin:6px 0 12px}
+.kv b{color:var(--muted);font-weight:500}
+.issue{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line)}
+.issue:last-child{border-bottom:0}
+.sev{font-size:11px;padding:1px 7px;border-radius:999px;font-weight:600}
+.sev.error{background:var(--bad-soft);color:var(--bad)}
+.sev.warn{background:var(--warn-soft);color:var(--warn)}
+.sev.info{background:var(--soft);color:var(--muted)}
+.pill{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px;overflow-x:auto}
+.tab{border:0;background:none;padding:7px 10px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-weight:600;font-size:13px;white-space:nowrap}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent)}
+details{margin:6px 0}
+summary{cursor:pointer;font-weight:600;font-size:13px}
+/* play */
+.play{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:14px}
+.log{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-height:300px;max-height:60vh;overflow:auto}
+.log p{margin:0 0 8px}
+.log .sp{color:var(--accent);font-weight:600}
+.log .sys{color:var(--muted);font-size:12.5px}
+.log .dmg{color:var(--bad);font-weight:600}
+.log .heal{color:var(--good);font-weight:600}
+.choices{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.choices .btn{text-align:left}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:13px;align-self:start}
+.bar{height:8px;background:var(--soft);border-radius:4px;overflow:hidden;margin:3px 0 8px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar.fp i{background:#4f86d6}
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+/* design cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:10px}
+.ccard{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.ccard .pt{display:flex;flex-direction:column;gap:6px;align-items:center}
+.ccard img{width:96px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.ccard .ph{width:96px;height:120px;border-radius:8px;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:700;color:var(--muted)}
+.ccard .up{font-size:12px;padding:4px 8px}
+.ccard .cn{font-weight:700;margin-bottom:4px}
+.kv.small{font-size:12.5px;gap:2px 10px;margin:4px 0 6px}
+.swatches{display:flex;gap:4px;flex-wrap:wrap}
+.sw{display:inline-block;width:18px;height:18px;border-radius:4px;border:1px solid var(--line)}
+.prompt{font-family:var(--font-mono);font-size:11.5px;background:var(--code);border:1px solid var(--line);border-radius:6px;padding:8px;white-space:pre-wrap;word-break:break-word}
+.stat img.hero{width:100%;max-width:200px;border-radius:8px;border:1px solid var(--line);margin-bottom:8px;display:block}
+.help{display:block;font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.45}
+.vgroup{margin:14px 0 6px}.vgroup h4{margin:0 0 2px;font-size:13px}
+.guide{display:grid;grid-template-columns:1fr 1fr;gap:14px;background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;margin:0 0 12px;font-size:13px}
+.guide p{margin:0}.guide ul,.guide ol{margin:0;padding-left:18px}.guide li{margin:2px 0}
+.guide .gl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:4px}
+.guide.ask{border-left-color:var(--good)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30;display:flex;align-items:flex-start;justify-content:center;padding:4vh max(16px,env(safe-area-inset-right,0px)) 4vh max(16px,env(safe-area-inset-left,0px));overflow:auto}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;max-width:760px;width:100%}
+@media (max-width:760px){.guide{grid-template-columns:1fr}}
+.toast{position:fixed;left:50%;bottom:calc(72px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;z-index:20}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-areas:"top" "rail" "work" "track"}
+  .top{grid-template-columns:1fr;gap:6px}
+  .top .ttl{text-align:left}
+  .top .actions{justify-content:flex-start}
+  .rail{border-right:0;border-bottom:1px solid var(--line);flex-direction:row;align-items:center;gap:6px;padding:6px max(8px,env(safe-area-inset-right,0px)) 6px max(8px,env(safe-area-inset-left,0px))}
+  .rail h4{margin:0 4px;white-space:nowrap}
+  #projList{display:flex;gap:4px;overflow-x:auto;flex:1}
+  .proj{width:auto;white-space:nowrap;grid-template-columns:auto auto}
+  .proj .pr{display:none}
+  .play{grid-template-columns:1fr}
+  .work{padding-left:max(16px,env(safe-area-inset-left,0px))}
+}
+/* editable cells, highlighted rows, hints, dialogue tree, play log */
+td.ed{cursor:text;min-width:60px}
+td.ed:hover{box-shadow:inset 0 0 0 1px var(--accent)}
+td.ed:focus{outline:2px solid var(--accent);outline-offset:-2px;background:var(--panel2)}
+tr.hl td{background:var(--accent-soft)}
+tr.edited td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+.hints{display:flex;flex-direction:column;gap:4px;margin:8px 0 2px}
+.hint-l{font-size:12px;padding:6px 10px;border-radius:6px;background:var(--soft)}
+.hint-l.warn{background:var(--warn-soft);color:var(--warn)}
+.hint-l.error{background:var(--bad-soft);color:var(--bad)}
+.hint-l.ok{background:var(--good-soft);color:var(--good)}
+.meta{font-size:12px;color:var(--muted);display:flex;gap:4px 14px;flex-wrap:wrap;margin:0 0 10px}
+.meta b{color:var(--ink);font-weight:600}
+.dlg{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:10px}
+.dlg.hl{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.dlg h4{margin:0 0 6px;font-size:13px}
+.node{margin:4px 0;padding-left:10px;border-left:2px solid var(--line);font-size:13px}
+.node .nid{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.node .spk{color:var(--accent);font-weight:600}
+.node .cond{font-family:var(--font-mono);font-size:11px;color:var(--warn)}
+.opt{margin:2px 0 2px 18px;font-size:12.5px}
+.opt .nx{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.opt .fx{font-family:var(--font-mono);font-size:11px;color:var(--good)}
+span[contenteditable]:focus{outline:2px solid var(--accent);outline-offset:1px;border-radius:3px;background:var(--panel2)}
+.yarn{font-family:var(--font-mono);font-size:12px;background:var(--code);border:1px solid var(--line);border-radius:7px;padding:10px;white-space:pre;overflow:auto;max-height:60vh}
+.npcs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.npcs .btn{padding:4px 10px;font-size:12.5px}
+.log .line{display:flex;gap:8px;align-items:flex-start;margin:0 0 8px}
+.log .line img{width:36px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex:none}
+.log .line p{margin:0}
+.log .end{color:var(--good);font-weight:700;font-size:14px}
+.grp{margin:0 0 16px}
+.grp h4{margin:0 0 6px;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.qlog{margin:8px 0 0;padding-left:16px;font-size:12px}
+.qlog li{margin:2px 0}
+.qlog li.cur{color:var(--accent);font-weight:600}
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">RPG 工坊</div>
+    <div class="ttl" id="ttl">RPG 工坊</div>
+    <div class="actions">
+      <span class="st" id="saveSt"></span>
+      <label class="st">模型 <select id="tier" class="sm"><option value="default">默认</option><option value="quick">快速</option><option value="complex">深思</option></select></label>
+      <button class="btn ghost" id="btnCfg" title="文本模型和图片模型的接口设置">⚙ 设置</button>
+      <button class="btn ghost" id="btnHelp" title="新手指南">？指南</button>
+      <button class="btn" id="btnPlay">文本试玩</button>
+      <button class="btn" id="btnExport" title="需要环节 9 校验通过">导出内容包</button>
+    </div>
+  </header>
+  <div class="overlay" id="help" hidden><div class="sheet">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">没做过游戏也能用：这个工具怎么走</h2><button class="btn ghost" id="btnHelpClose">关闭</button></div>
+    <p class="lead">一个 RPG 由三层组成：剧情层（世界、人物、任务、对白）、玩法层（数值、战斗、地图）、美术层。这个工具把它拆成 11 个环节，每个环节你只做两件事：点"用 AI 生成"，然后看一眼结果决定通过还是改。</p>
+    <div class="guide"><div><div class="gl">你负责的</div><ul><li>环节 0：写一个世界的点子和一段故事骨架（故事必须是人写的）</li><li>每个环节：看结果、直接点表格里的格子改、点"通过"</li><li>环节 3：拿 prompt 去生图工具出立绘，传回来</li><li>环节 9：把红色错误清零；环节 10：试玩一遍、导出内容包</li></ul></div><div><div class="gl">AI 和程序负责的</div><ul><li>把点子扩成世界设定和角色卡</li><li>把骨架切成章节、任务、对白</li><li>生成技能、物品、敌人、地图的数据表</li><li>查结构、查引用、算数值、自动打一遍看能不能通关</li></ul></div></div>
+    <h3>几条规则</h3><ul class="hint" style="margin:0 0 8px;padding-left:18px"><li>每个环节生成完会先过一道结构检查，有错误就不能点"通过"，下一环节不解锁。</li><li>你在表格里改过的行会被记住：重新生成时保留你改的，只换其他行。</li><li>对白页按 NPC 分页，可以只重生成一个 NPC 的台词；.yarn 文本由节点表自动生成。</li><li>导出内容包前，环节 9 必须标记通过。内容包里是表的 JSON 和 CSV、.yarn 对白、形象卡、美术需求单、问题清单。</li></ul>
+    <h3>大概要多久</h3><p class="hint">用"新手小体量"预设：每个 AI 环节 30 秒到 2 分钟，全流程 8 次生成，加上看结果的时间，一个小时左右能拿到一个可以文本试玩的小游戏。</p>
+    <h3>几个会反复出现的词</h3><div class="kv"><b>NPC</b><div>游戏里不受玩家控制的角色，比如村长、商人、反派</div><b>任务</b><div>一条"去哪、做什么、交给谁、得到什么"的记录，是整个游戏的枢纽</div><b>flag（标记）</b><div>游戏的记忆：玩家做过什么选择、完成过什么任务，用它决定后面能接什么任务、NPC 说什么话</div><b>回合制</b><div>你一下我一下的战斗方式</div><b>成长曲线</b><div>角色和敌人随等级变强的公式</div><b>tier（档位）</b><div>装备的强弱档，1 档最弱</div></div>
+  </div></div>
+  <div class="overlay" id="cfg" hidden><div class="sheet" style="max-width:640px">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">模型设置</h2><button class="btn ghost" id="btnCfgClose">关闭</button></div>
+    <p class="lead" id="cfgLead"></p>
+    <div class="card"><h3 style="margin:0 0 6px">文本模型：写设定、任务、对白</h3>
+      <div class="row" id="cfgTextModes"></div>
+      <div id="cfgTextDirect" hidden><div class="vars" style="margin-top:8px"><label class="f"><span>接口地址（OpenAI 兼容）</span><input type="text" id="cfgTBase" placeholder="https://api.deepseek.com/v1"></label><label class="f"><span>API key</span><input type="password" id="cfgTKey" autocomplete="off"></label><label class="f"><span>模型名</span><input type="text" id="cfgTModel" placeholder="deepseek-chat"></label></div><p class="hint" style="margin:0">key 只保存在这台电脑的浏览器里，请求从浏览器直接发给接口。常用地址：DeepSeek https://api.deepseek.com/v1 · 通义 https://dashscope.aliyuncs.com/compatible-mode/v1 · 硅基流动 https://api.siliconflow.cn/v1 · OpenAI https://api.openai.com/v1 · Claude https://api.anthropic.com/v1。个别接口不允许浏览器直连，会报跨域错误，那就改用后端模式。</p></div>
+      <div id="cfgTextBackend" hidden><div class="vars" style="margin-top:8px"><label class="f"><span>后端地址（留空 = 和页面同一个域名）</span><input type="text" id="cfgBase" placeholder="https://rpg-api.example.com"></label><label class="f"><span>访问口令（后端 .env 里的 APP_TOKEN）</span><input type="password" id="cfgToken" autocomplete="off"></label></div><p class="hint" style="margin:0">后端是随包附带的 server.js，key 放在后端，页面不碰 key。</p></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="btnCfgTestT">测试文本模型</button><span class="hint" id="cfgMsgT"></span></div></div>
+    <div class="card"><h3 style="margin:0 0 6px">图片模型：在环节 3 直接生成立绘</h3>
+      <div class="row" id="cfgImgModes"></div>
+      <div id="cfgImgDirect" hidden><div class="vars" style="margin-top:8px"><label class="f"><span>接口地址（OpenAI 兼容的 images/generations）</span><input type="text" id="cfgIBase" placeholder="https://api.siliconflow.cn/v1"></label><label class="f"><span>API key</span><input type="password" id="cfgIKey" autocomplete="off"></label><label class="f"><span>模型名</span><input type="text" id="cfgIModel" placeholder="Kwai-Kolors/Kolors"></label><label class="f"><span>尺寸</span><input type="text" id="cfgISize" placeholder="1024x1024"></label></div><p class="hint" style="margin:0">支持 OpenAI（gpt-image-1 / dall-e-3）、硅基流动（Kolors、FLUX）、智谱 CogView 等走 images/generations 的接口。Midjourney、即梦、通义万相不是这个格式，用它们就拿 prompt 手动生成再上传。</p></div>
+      <div id="cfgImgBackend" hidden><p class="hint" style="margin:8px 0 0">用上面"后端"那组地址和口令，图片模型在后端 .env 的 IMG_* 里配置。</p></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="btnCfgTestI">测试图片模型</button><span class="hint" id="cfgMsgI"></span></div></div>
+    <div class="row"><button class="btn primary" id="btnCfgSave">保存并应用</button><span class="hint">保存后立刻生效，不用刷新。</span></div>
+  </div></div>
+  <aside class="rail">
+    <h4>项目</h4>
+    <div id="projList"></div>
+    <button class="btn ghost" id="btnNew">+ 新建项目</button>
+  </aside>
+  <section class="work" id="work"></section>
+  <nav class="track" id="steps" aria-label="环节进度"></nav>
+</div>
+
+<script>
+/* ---------- constants ---------- */
+const STAGES = [
+  {n:0,name:'输入与定变量',out:'输入包',ai:false},
+  {n:1,name:'世界观扩写',out:'世界设定表',ai:true},
+  {n:2,name:'角色与 NPC 设定',out:'主角 + NPC 表',ai:true},
+  {n:3,name:'人物形象设计',out:'风格指南 + 角色形象卡 + 生图 prompt',ai:true},
+  {n:4,name:'主线与章节拆解',out:'章节事件表',ai:true},
+  {n:5,name:'玩法数据生成',out:'9 张数据表 + 成长曲线',ai:true},
+  {n:6,name:'任务生成',out:'任务表 + flag 表',ai:true},
+  {n:7,name:'对白生成',out:'对话节点表',ai:true},
+  {n:8,name:'地图与事件生成',out:'地图表 + 事件表 + 场景美术需求',ai:true},
+  {n:9,name:'校验与模拟',out:'问题清单',ai:false},
+  {n:10,name:'构建与试玩',out:'内容包 zip / 文本试玩',ai:false},
+];
+const VARS = [
+  ['engine','目标引擎','select',['HTML 文本版','RPG Maker MZ','Godot Open RPG'],'HTML 文本版','最后把内容装进哪个引擎。HTML 文本版不用装任何软件，直接在这个页面试玩，第一次做选它。'],
+  ['hours','游戏时长（小时）','number',null,2,'玩家通关大概玩多久。每小时约 4–6 个任务，时长越长要生成的内容越多。'],
+  ['chapters','章节数','number',null,2,'主线分几幕，像电影的开端、发展、结局。1–3 章足够一个小游戏。'],
+  ['main_quests','主线任务数','number',null,6,'必须完成才能推进剧情的任务数。'],
+  ['side_quests','支线任务数','number',null,3,'可做可不做的小任务，用来展示世界和 NPC 的个人故事。'],
+  ['branch','分支程度','select',['无分支','小分支大汇合','多结局'],'小分支大汇合','玩家的选择会不会改变剧情。"小分支大汇合"最省内容：选项改几句对白和一个标记，剧情很快合流；"多结局"内容量成倍增加。'],
+  ['endings','结局数','number',null,2,'有几个不同的结局。无分支时填 1。'],
+  ['npc_max','NPC 数量上限','number',null,8,'有名字、会说话的角色最多几个。6–8 个足够，每个都要写台词。'],
+  ['combat','战斗类型','select',['回合制','无战斗'],'回合制','回合制就是你一下我一下，像宝可梦；无战斗则只有对话和探索。'],
+  ['party','队伍规模','number',null,1,'同时操控几个角色。1 最简单，也最容易做好。'],
+  ['classes','职业数','number',null,1,'职业决定角色擅长什么，像战士、法师。只有 1 个职业时用技能树体现差异。'],
+  ['trees','每职业技能树数','number',null,3,'每个职业有几条成长方向，比如攻击 / 防御 / 魔法，玩家选一条主练。'],
+  ['tree_depth','技能树层数','number',null,4,'每条方向有几层技能，层数越多成长越长，但要生成更多技能。'],
+  ['attrs','属性集合','text',null,'HP、FP、攻击、防御','角色身上的数值。HP 是血量，FP 是放技能用的精力，攻击和防御决定伤害高低。'],
+  ['level_cap','等级上限','number',null,20,'最高练到几级。2 小时的游戏 10–20 级合适。'],
+  ['difficulty','难度曲线','select',['平缓','适中','陡峭'],'适中','敌人随章节变强的速度。平缓适合第一次做。'],
+  ['enemy_types','敌人类型','text',null,'人类、吸血鬼、野兽、灵体','敌人分几大类，影响克制关系和美术，一般 3–4 类。'],
+  ['elements','属性克制','select',['有','无'],'有','有克制时技能分属性，打对属性伤害更高，战斗更有策略；无克制更简单。'],
+  ['economy','经济','select',['有货币和商店','仅货币','无'],'有货币和商店','有没有金币和商店。有商店就要多设计一套物品价格，由程序按公式算。'],
+  ['fail_mode','失败处理','select',['回最近存档点','读档','无惩罚'],'回最近存档点','打输了怎么办。回存档点是最常见的做法。'],
+  ['map_count','地图数','number',null,3,'几张可以走的地图，每张对应一个大地点。'],
+  ['map_types','区域类型','text',null,'村庄、野外、地牢','地图的种类：村庄是安全区和接任务的地方，野外有敌人，地牢是高潮战斗。'],
+  ['art_style','美术风格','text',null,'像素、暗黑奇幻','给生图工具和素材包的风格关键词。'],
+  ['content_limit','内容限制','text',null,'12+，无血腥描写','年龄分级和不能出现的内容，AI 在每个环节都会遵守。'],
+];
+const VAR_GROUPS=[
+  {title:'一、做多大',intro:'先决定体量。体量决定后面每个环节要生成多少东西，第一次做建议选"新手小体量"。',keys:['engine','hours','chapters','main_quests','side_quests']},
+  {title:'二、剧情怎么分叉',intro:'分支是 RPG 最花内容的地方：每多一个结局，后半段的任务和对白都要多写一份。',keys:['branch','endings','npc_max']},
+  {title:'三、战斗和成长',intro:'这些决定"打怪升级"的规则。你只需要定方向，具体数值由程序按公式算出来，不用你填数字。',keys:['combat','party','classes','trees','tree_depth','attrs','level_cap','difficulty','enemy_types','elements']},
+  {title:'四、世界的规则',intro:'钱、死亡和地图。',keys:['economy','fail_mode','map_count','map_types']},
+  {title:'五、美术和限制',intro:'',keys:['art_style','content_limit']},
+];
+const PRESETS={
+  '新手小体量':{hours:1,chapters:1,main_quests:4,side_quests:2,branch:'小分支大汇合',endings:1,npc_max:5,party:1,classes:1,trees:2,tree_depth:3,level_cap:8,difficulty:'平缓',elements:'有',map_count:2,map_types:'村庄、野外',engine:'HTML 文本版'},
+  '标准短篇':{hours:2,chapters:2,main_quests:6,side_quests:3,branch:'小分支大汇合',endings:2,npc_max:8,party:1,classes:1,trees:3,tree_depth:4,level_cap:20,difficulty:'适中',elements:'有',map_count:3,map_types:'村庄、野外、地牢'},
+  '完整章节':{hours:4,chapters:3,main_quests:10,side_quests:6,branch:'多结局',endings:2,npc_max:12,party:1,classes:2,trees:3,tree_depth:5,level_cap:25,difficulty:'适中',elements:'有',map_count:5,map_types:'村庄、野外、地牢、城市'},
+};
+const SKELETON_TEMPLATE=`主角是____（身份），因为____（动机）来到____。
+第一章：主角在____遇到____，发现____，被迫____。
+第二章：主角进入____，得知真相：____。他/她必须在____和____之间做出选择。
+结局 A：选择____，结果____。
+结局 B：选择____，结果____。`;
+const GUIDES={
+  1:{what:'AI 把你的 idea 和骨架扩成一张"世界设定表"：有哪些地点、哪些势力、这个世界的规则是什么、核心冲突是什么。',check:['地点有没有覆盖你在变量里要的区域类型','势力的立场和骨架一致吗，有没有凭空多出来的大反派','不喜欢的名字直接在下面的 JSON 里改，改完点"应用"']},
+  2:{what:'AI 给主角和每个 NPC 写一张"角色卡"：身份、住在哪、性格、怎么说话（附两句例句）、在游戏里负责什么。后面所有台词都以这张卡为准。',check:['骨架里出现的人物都在吗','例句读出来像两个不同的人吗，说话风格要有区别','谁发任务（quest_giver）、谁是商人、谁是反派标清楚了吗']},
+  3:{what:'AI 为每个角色做形象设计：轮廓、面部、服装、配色、标志性物件，以及生图 prompt。在"设置"里填了图片模型后，点卡片上的"生成立绘"直接出图；也可以拿 prompt 去 Midjourney / 即梦生成再上传。',check:['主角和反派一眼能分开吗','同一势力的角色有没有共享的配色或纹样','风格指南和你定的美术风格一致吗','生成的立绘不满意就改 prompt 再生成一次，旧图会被替换']},
+  4:{what:'AI 把骨架切成章节和"事件"，每个事件是一件推动剧情的事（起因、经过、结果、谁在场、在哪发生）。后面每个任务都来自一个事件。',check:['事件顺序和你的骨架一致吗','主线事件数等于你定的主线任务数吗','标了分支的事件，是不是你真的想让玩家做选择的地方']},
+  5:{what:'AI 生成"打怪升级"的规则数据：职业和技能树、技能、物品和装备、敌人和敌群、状态效果、商店、成长曲线。它只给基础值和倍率，每一级的具体数字由程序算。',check:['技能名字有没有重复或太像','武器从低到高（tier 1、2、3）是不是越来越强','每章末尾有没有一个 boss','敌人弱点分布均匀吗，别全是同一种属性']},
+  6:{what:'AI 把每个事件变成一条可执行的任务记录：谁发布、在哪接、分几步做什么（打谁 / 找什么 / 和谁说话 / 去哪）、交给谁、奖励什么、完成后记下什么标记（flag）。',check:['每个任务都有发布人、地点、分步目标、奖励吗','主线任务能通过 next_quest_id 串成一条链吗','奖励的武器有没有随章节变强','想改某一行，直接点表格里的格子']},
+  7:{what:'AI 为每个任务写接取和交付两段对白，并给出选项。台词必须符合角色卡的说话风格。这一页按 NPC 分页，可以只重生成一个 NPC 的台词；.yarn 源文本由节点自动生成。',check:['读起来像那个人说的话吗（切到该 NPC 的分页逐段看）','两个选项是真的不同，还是换了个说法','交付对白有没有按结果分开（比如救到人和没救到）','不满意的句子直接点着改，重生成时会保留']},
+  8:{what:'AI 把地点变成地图（几张、多大、怎么连通），把 NPC、敌群、宝箱、传送点放到地图上，并列出场景美术需求。',check:['每个 NPC 都放在某张地图上了吗','任务要打的敌群在对的地图上吗','地图之间能走通吗，解锁条件合理吗']},
+  9:{what:'程序自动做四道检查：结构（每张表该有的字段和数量）、引用（id 和 flag 是否都存在）、数值（按成长曲线自动把所有任务打一遍）、AI 一致性（人物、地点、台词风格）。问题按环节和类型分组，点"去这一行"直接跳到出问题的那一行。',check:['红色错误必须清零才能通过，也才能导出内容包','战斗模拟"战败"的任务，回环节 5 降低敌人倍率或加奖励经验','警告可以先放着，但建议看一眼']},
+  10:{what:'把所有表打包：在页面里文本试玩一遍（NPC 话题菜单、分步目标、战斗、结局、对话框里带立绘），或者导出内容包 zip 交给程序装进 Godot / RPG Maker。',check:['试玩时注意对白顺序、选项效果、战斗难度、结局是否按 flag 分开','导出前确认环节 9 已通过']},
+};
+const EXAMPLE = {
+  idea:'示例：雾港。一座被永恒潮汐封锁的港口城，灯塔守护者世代用"潮语"与海沟里的旧神谈判换取平静。十年前灯塔熄灭，鱼人开始在夜里上岸，城里的议会把责任推给逃走的末代守塔人。',
+  skeleton:'示例骨架（人写，AI 只扩写）：主角是守塔人的养女，在父亲失踪后回到雾港。第一章：她在码头区找到父亲留下的潮语笔记，被议会卫兵追捕，获得渔民帮助。第二章：她进入海沟边的旧灯塔，发现父亲并未逃走而是被议会囚禁，并得知旧神索要的"祭品"其实是议会每年献上的穷人。结局分支：公开真相推翻议会（城市陷入动荡但自由），或接替父亲继续谈判（和平但黑暗延续）。',
+};
+const CURVE_DEFAULT = {player_hp_base:100,player_hp_per_level:12,player_fp_base:30,player_fp_per_level:4,player_atk_base:10,player_atk_per_level:2,player_def_base:3,player_def_per_level:1,enemy_hp_base:24,enemy_hp_per_level:9,enemy_atk_base:6,enemy_atk_per_level:1.6,enemy_def_per_level:0.6,weapon_atk_per_tier:4,armor_def_per_tier:2,xp_per_level_base:60,quest_xp_per_level:40,enemy_xp_per_level:10,potion_heal_ratio:0.4,chapter_mult:[1,1.3,1.6,2]};
+
+/* ---------- state ---------- */
+const S = {db:null,sample:null,downloads:null,user:null,assets:null,blobs:{},standalone:false,claudeSample:null,genImg:new Set(),projects:[],pid:null,P:null,stages:{},cur:0,ctl:null,running:null,tier:'default',play:null,tab:{},hl:null,ui7:{npc:'all',view:'tree'}};
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = ()=>Math.random().toString(36).slice(2,10);
+function toast(m){document.querySelectorAll('.toast').forEach(x=>x.remove());const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.append(t);setTimeout(()=>t.remove(),2600)}
+
+/* ---------- persistence (db, fallback localStorage) ---------- */
+const LS='rpgws:v1';
+function lsRead(){try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){return {}}}
+function lsWrite(o){try{localStorage.setItem(LS,JSON.stringify(o))}catch(e){}}
+async function listProjects(){
+  if(S.db){try{const q=await S.db.collection('projects').get();S.projects=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));return}catch(e){console.warn(e)}}
+  const o=lsRead();S.projects=Object.values(o.projects||{}).map(p=>({id:p.id,name:p.name,updatedAt:p.updatedAt})).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+}
+const clone=o=>JSON.parse(JSON.stringify(o));
+async function loadProject(pid){
+  S.pid=pid;S.stages={};
+  if(S.db){try{
+    const d=await S.db.doc('projects/'+pid).get();if(!d.exists)return false;S.P=clone({id:pid,...d.data()});
+    const st=await S.db.collection('projects/'+pid+'/stages').get();st.docs.forEach(x=>{S.stages[x.id.replace('s','')]=clone(x.data())});
+    return true}catch(e){console.warn(e)}}
+  const o=lsRead();const p=(o.projects||{})[pid];if(!p)return false;S.P=clone(p.meta);S.stages=clone(p.stages||{});return true;
+}
+let saveTimer=null;
+function markSave(){$('#saveSt').textContent='未保存…';clearTimeout(saveTimer);saveTimer=setTimeout(saveProject,600)}
+async function saveProject(){
+  if(!S.P)return;S.P.updatedAt=Date.now();
+  if(S.db){try{const {id,...body}=S.P;await S.db.doc('projects/'+S.P.id).set(body);$('#saveSt').textContent='已保存';return}catch(e){console.warn(e);$('#saveSt').textContent='保存失败（'+e.code+'）'}}
+  const o=lsRead();o.projects=o.projects||{};o.projects[S.P.id]=o.projects[S.P.id]||{id:S.P.id};o.projects[S.P.id].meta=S.P;o.projects[S.P.id].name=S.P.name;o.projects[S.P.id].updatedAt=S.P.updatedAt;o.projects[S.P.id].stages=S.stages;lsWrite(o);$('#saveSt').textContent='已保存（本机）';
+}
+async function saveStage(n){
+  const body=S.stages[n];if(!body)return;
+  if(S.db){try{await S.db.doc('projects/'+S.P.id+'/stages/s'+n).set(body);return}catch(e){console.warn(e);toast('环节结果保存失败：'+(e.message||e.code))}}
+  await saveProject();
+}
+let creating=false;
+async function newProject(){
+  if(creating)return;creating=true;
+  try{
+    await listProjects();
+    const id='p_'+uid();const vars={};VARS.forEach(v=>vars[v[0]]=v[4]);
+    let k=S.projects.length+1,name='新项目 '+k;while(S.projects.some(p=>p.name===name)){k++;name='新项目 '+k}
+    S.P={id,name,createdAt:Date.now(),updatedAt:Date.now(),inputs:{idea:EXAMPLE.idea,skeleton:EXAMPLE.skeleton,vars},statuses:{}};
+    S.pid=id;S.stages={};S.cur=0;S.play=null;await saveProject();await listProjects();render();
+  }finally{creating=false}
+}
+function setStatus(n,st){S.P.statuses[String(n)]=st;markSave()}
+const stOf=n=>S.P?.statuses?.[String(n)]||'';
+const unlocked=n=>n===0||stOf(n-1)==='done'||stOf(n)||n===9||n===10;
+
+/* ---------- formulas (shared by simulation and play) ---------- */
+function curve(){return Object.assign({},CURVE_DEFAULT,(S.stages[5]?.data?.curve)||{})}
+function playerStats(L,wTier,aTier){const c=curve();return{hp:Math.round(c.player_hp_base+c.player_hp_per_level*(L-1)),fp:Math.round(c.player_fp_base+c.player_fp_per_level*(L-1)),atk:Math.round(c.player_atk_base+c.player_atk_per_level*(L-1)+(wTier||0)*c.weapon_atk_per_tier),def:Math.round(c.player_def_base+c.player_def_per_level*(L-1)+(aTier||0)*c.armor_def_per_tier)}}
+function enemyStats(e){const c=curve();const L=Number(e.level)||1;return{hp:Math.round((c.enemy_hp_base+c.enemy_hp_per_level*(L-1))*(Number(e.hp_mult)||1)),atk:Math.round((c.enemy_atk_base+c.enemy_atk_per_level*(L-1))*(Number(e.atk_mult)||1)),def:Math.round(c.enemy_def_per_level*(L-1)),xp:Math.round(c.enemy_xp_per_level*L)}}
+function xpNeed(L){return Math.round(curve().xp_per_level_base*L)}
+function questXp(q){const c=curve();return Number(q.reward?.xp)||Math.round(c.quest_xp_per_level*(Number(q.level)||1))}
+const byId=(arr,id)=>(arr||[]).find(x=>x&&x.id===id);
+function tables(){const d4=S.stages[5]?.data||{};return{world:S.stages[1]?.data||{},npcs:S.stages[2]?.data?.npcs||[],hero:S.stages[2]?.data?.hero||{},design:S.stages[3]?.data||{},chapters:S.stages[4]?.data?.chapters||[],classes:d4.classes||[],skills:d4.skills||[],items:d4.items||[],enemies:d4.enemies||[],troops:d4.troops||[],states:d4.states||[],shops:d4.shops||[],quests:S.stages[6]?.data?.quests||[],flags:S.stages[6]?.data?.flags||[],dialogs:S.stages[7]?.data?.dialogs||[],maps:S.stages[8]?.data?.maps||[],events:S.stages[8]?.data?.events||[]}}
+const blobUrl=id=>id?(S.blobs[id]||('/_blob/'+id)):null;
+const portraitUrl=c=>c?(c.portrait_id?blobUrl(c.portrait_id):(c.portrait_url||null)):null;
+function portraitOf(id){return portraitUrl((S.stages[3]?.data?.characters||[]).find(x=>x.id===id))}
+
+/* ---------- prompts ---------- */
+function trimJson(o,max=60000){let s=JSON.stringify(o===undefined?null:o);if(s.length>max)s=s.slice(0,max)+'…(已截断)';return s}
+function promptFor(n,opts={}){
+  const I=S.P.inputs,v=I.vars,T=tables();const noCombat=v.combat==='无战斗';
+  const head=`你是资深 RPG 策划，正在为一款 2D ${v.combat} RPG 生产内容。只输出一个 JSON 对象，不要解释，不要 Markdown 代码块。所有文本用中文，id 用英文小写加下划线且在同一表内唯一。内容限制：${v.content_limit}。`;
+  if(n===1)return `${head}
+任务：根据世界观 idea 和人写的故事骨架，扩写出世界设定。不要改动骨架里的事实，只补充细节。
+【idea】${I.idea}
+【故事骨架】${I.skeleton}
+【变量】地图数 ${v.map_count}，区域类型：${v.map_types}；敌人类型：${v.enemy_types}；美术风格：${v.art_style}。
+要求：locations ${Number(v.map_count)+2} 到 ${Number(v.map_count)+4} 个，覆盖上述区域类型，danger 为 1-5 的整数；factions 2-4 个；rules 3-5 条；visual 是给美术或 AI 生图的一句视觉描述。
+输出格式：
+{"title":"游戏名","locations":[{"id":"loc_harbor","name":"","region":"","desc":"","danger":1,"visual":""}],"factions":[{"id":"fac_council","name":"","stance":"","leader":""}],"rules":[{"name":"","desc":""}],"conflict":"核心冲突一句话"}`;
+  if(n===2)return `${head}
+任务：根据世界设定和故事骨架，生成主角设定和 NPC 表。NPC 不超过 ${v.npc_max} 个，必须包含骨架里出现的人物；每个 NPC 要有明确功能（quest_giver 任务发布者、merchant 商人、story 剧情角色、villain 反派、extra 路人），至少 ${Math.max(2,Math.ceil(Number(v.main_quests)/3))} 个 quest_giver${v.economy==='有货币和商店'?'，至少 1 个 merchant':''}。speech_style 要具体（语气、口头禅），examples 给 2 句该角色会说的话。location 必须是世界设定里的 location id。队伍规模 ${v.party}${Number(v.party)>1?'，companions 列出可加入队伍的角色':''}。
+【故事骨架】${I.skeleton}
+【世界设定】${trimJson(T.world)}
+输出格式：
+{"hero":{"name":"","identity":"","motive":"","appearance":""},"npcs":[{"id":"npc_x","name":"","identity":"","location":"loc_x","faction":"fac_x 或空","personality":"","speech_style":"","examples":["",""],"relation":"与主角的关系","function":"quest_giver","appear_condition":"默认出现 或 某 flag","appearance":"给美术的外观描述"}]}`;
+  if(n===3)return `${head}
+任务：为主角和每个 NPC 做人物形象设计，并给出全局风格指南。美术风格：${v.art_style}；队伍规模 ${v.party}。形象要从人物的身份、性格、势力和世界观里长出来（personality_cues 说明性格怎么体现在外观上），同一势力的角色共享配色或纹样，主角和反派的轮廓要一眼区分。colors 用十六进制色值。portrait_prompt_en 是给 Midjourney / Stable Diffusion / 即梦 等生图工具的英文提示词（含风格、景别、背景、光线），portrait_prompt_zh 是同义中文版；negative_prompt 列出要避免的内容。walk_sprite 给行走图的素材包来源建议和特征描述，不生成像素图。expressions 给 4 个对白用的表情名。
+【世界设定】${trimJson({title:T.world.title,factions:T.world.factions,rules:T.world.rules,conflict:T.world.conflict},8000)}
+【主角】${trimJson(T.hero)}
+【NPC】${trimJson(T.npcs.map(x=>({id:x.id,name:x.name,identity:x.identity,faction:x.faction,personality:x.personality,function:x.function,appearance:x.appearance})))}
+输出格式：
+{"style_guide":{"art_style":"","proportion":"如 2.5 头身像素行走图 + 7 头身立绘","line_and_shading":"","palette":["#1a1a2e","#c0392b"],"faction_motifs":[{"faction":"fac_x","motif":"纹样或配色特征"}],"notes":""},"characters":[{"id":"hero","name":"","role":"主角/任务发布者/反派/商人/路人","silhouette":"体型与轮廓特征","face":"脸型、发型、眼睛、标志性特征","outfit":"","colors":{"main":"#","secondary":"#","accent":"#"},"signature_item":"随身的标志性物件","personality_cues":"","expressions":["默认","微笑","愤怒","悲伤"],"portrait_prompt_zh":"","portrait_prompt_en":"","negative_prompt":"","walk_sprite":{"source":"RPG Maker MZ 自带 / Kenney / 自绘","base":"推荐的素材特征"}}]}`;
+  if(n===4)return `${head}
+任务：把故事骨架切成 ${v.chapters} 章，列出每章的关键事件，改成玩家视角（主角 = 玩家）。事件总数约 ${Number(v.main_quests)+Number(v.side_quests)} 个，其中 kind 为 main 的 ${v.main_quests} 个按骨架顺序推进，kind 为 side 的 ${v.side_quests} 个来自 NPC 的个人需求。分支程度：${v.branch}，结局 ${v.endings} 个；branch 为 true 的事件给 2 个 options，并说明各自后果。level 是建议玩家等级，从 1 逐章递增到不超过 ${v.level_cap}。npcs 和 location 只能用已有 id。
+【故事骨架】${I.skeleton}
+【地点】${trimJson(T.world.locations)}
+【NPC】${trimJson((T.npcs).map(x=>({id:x.id,name:x.name,function:x.function,location:x.location})))}
+输出格式：
+{"chapters":[{"id":"ch_1","title":"","summary":"","events":[{"id":"ev_1_01","kind":"main","title":"","cause":"","process":"","result":"","npcs":["npc_x"],"location":"loc_x","branch":false,"options":[{"text":"","consequence":""}],"level":1}]}],"endings":[{"id":"end_a","name":"","condition":"达成条件，写成 flag 表达式，如 chose_truth==true，多个用 && 连接；默认结局写空字符串","summary":"结局正文 2-3 句"}]}`;
+  if(n===5)return `${head}
+任务：生成玩法层数据表。只给基础值和倍率，具体每级数值由程序按公式计算。属性集合：${v.attrs}；等级上限 ${v.level_cap}；难度曲线 ${v.difficulty}；敌人类型：${v.enemy_types}；属性克制：${v.elements}；职业 ${v.classes} 个，每个 ${v.trees} 条技能树、每条 ${v.tree_depth} 层；经济：${v.economy}；失败处理：${v.fail_mode}。${noCombat?'\n本作无战斗：enemies、troops、skills 输出空数组，classes 只给 1 个职业且 trees 为空，重点生成 items（道具、钥匙、线索物）、states（剧情状态）、shops 和 curve。':''}
+要求：skills 每职业 ${Number(v.trees)*Number(v.tree_depth)} 个左右，element 取 ${v.elements==='有'?'神圣/暗黑/奥术/无':'无'}，power 是普攻的倍率（1.2-2.5），cost 消耗 FP；items 包含 kind 为 weapon（tier 1-${Math.ceil(Number(v.level_cap)/5)}）、armor、item（effect_type 取 heal_hp/heal_fp/key/misc）共 12-20 个；enemies 覆盖所有敌人类型，${Number(v.chapters)*3} 到 ${Number(v.chapters)*5} 种，level 分布在 1 到 ${v.level_cap}，含 ${v.chapters} 个 boss；weakness 是一种 element；troops 把敌人组成 ${Number(v.chapters)*4} 组；states 4-6 个；curve 按难度调整倍率，chapter_mult 长度为 ${v.chapters}。
+【世界设定】${trimJson({title:T.world.title,factions:T.world.factions,rules:T.world.rules,conflict:T.world.conflict})}
+【敌对势力/怪物灵感】地点列表 ${trimJson((T.world.locations||[]).map(l=>l.name+'(危险'+l.danger+')'))}
+输出格式：
+{"classes":[{"id":"cls_x","name":"","desc":"","trees":[{"name":"","nodes":[{"node_id":"t1_1","name":"","skill_id":"sk_x","prereq":"t1_0 或空","max_points":3}]}]}],"skills":[{"id":"sk_x","name":"","desc":"","cost":10,"power":1.5,"element":"无","status":"st_x 或空","unlock_level":1}],"items":[{"id":"it_x","kind":"weapon","name":"","desc":"","tier":1,"effect_type":"","icon_desc":""}],"enemies":[{"id":"en_x","name":"","type":"","level":1,"hp_mult":1.0,"atk_mult":1.0,"skills":[""],"weakness":"暗黑","boss":false,"drops":[{"item_id":"it_x","chance":0.3}],"appearance":""}],"troops":[{"id":"tr_x","name":"","members":["en_x","en_x"],"level":1}],"states":[{"id":"st_x","name":"","effect":"","turns":2}],"shops":[{"npc_id":"npc_x","items":["it_x"]}],"curve":${JSON.stringify(CURVE_DEFAULT)}}`;
+  if(n===6)return `${head}
+任务：把章节事件表转成任务表和 flag 表。每个事件转成 1 个任务（branch 事件的两个选项通过 set_flags 分开记录）。每个任务写 desc（给玩家看的任务描述，1-2 句）和 steps（分步目标 1-3 步，按顺序完成）；step.type 取 ${noCombat?'collect/talk/reach（本作无战斗，不能用 kill）':'kill/collect/talk/reach'}；kill 步骤的 target_id 是敌群 id 且敌群等级接近任务 level，talk 步骤的 target_id 是 NPC id，reach 步骤的 target_id 是地点 id，collect 步骤的 target_id 是物品 id。objective 等于第一个 step；troop_id 填 kill 步骤的敌群（没有则为空）。reward.item_ids 从物品表取，随章节给出更高 tier 的武器；reward.xp 留空由程序计算；prereq_flags 只引用 flags 表里定义的 flag，第一个主线任务无前置；set_flags 至少写入 quest_done 类 flag；branch 事件对应的任务，两个选项分别写入不同的 flag，并在 flags 表里定义；next_quest_id 串成主线链。giver_npc 和 deliver_npc 用 NPC id，location_id 用地点 id。
+【章节事件】${trimJson(T.chapters)}
+【NPC】${trimJson(T.npcs.map(x=>({id:x.id,name:x.name,function:x.function,location:x.location})))}
+【物品】${trimJson(T.items.map(x=>({id:x.id,kind:x.kind,name:x.name,tier:x.tier,effect_type:x.effect_type})))}
+【敌群】${trimJson(T.troops)}
+【地点 id】${trimJson((T.world.locations||[]).map(l=>l.id))}
+输出格式：
+{"quests":[{"id":"q_1_01","name":"","kind":"main","chapter_id":"ch_1","event_id":"ev_1_01","giver_npc":"npc_x","location_id":"loc_x","prereq_flags":[],"desc":"任务描述","steps":[{"type":"talk","target_id":"npc_x","count":1,"desc":"一句话目标"},{"type":"kill","target_id":"tr_x","count":1,"desc":"一句话目标"}],"objective":{"type":"talk","target_id":"npc_x","count":1,"desc":"一句话目标"},"troop_id":"tr_x 或空","deliver_npc":"npc_x","reward":{"xp":null,"gold":30,"item_ids":["it_x"],"unlock":"解锁的地图或能力，或空"},"set_flags":[{"flag":"q_1_01_done","value":true}],"next_quest_id":"q_1_02 或空","level":1}],"flags":[{"name":"q_1_01_done","meaning":"","written_by":"q_1_01","read_by":["q_1_02"]}]}`;
+  if(n===7){const qs=opts.quests||T.quests;return `${head}
+任务：为${opts.quests?'下面这几个':'每个'}任务写对白：accept（接取）和 deliver（交付）两段，节奏紧凑，每段 2-4 个节点。每个 NPC 的台词必须符合其 speech_style，可以化用其 examples 的语气。accept 段第一个节点给 2 个真有差别的选项：都会接受任务（effects 含 accept_quest），但其中一个额外写入一个态度类 flag。分支程度：${v.branch}。deliver 段用 condition 区分结果（condition 形如 "flag_name==true"，无条件写 null）。speaker 用 NPC 的 name，玩家一方的旁白 speaker 写 "旁白"。next 为 null 表示该段结束。dialog 的 id 固定为 d_任务id_accept / d_任务id_deliver。
+【任务】${trimJson(qs.map(q=>({id:q.id,name:q.name,desc:q.desc,giver_npc:q.giver_npc,deliver_npc:q.deliver_npc,steps:q.steps||(q.objective?[q.objective]:[]),set_flags:q.set_flags,prereq_flags:q.prereq_flags,event_id:q.event_id})))}
+【事件】${trimJson(T.chapters.flatMap(c=>c.events||[]).map(e=>({id:e.id,title:e.title,cause:e.cause,result:e.result,options:e.options})))}
+【NPC】${trimJson(T.npcs.map(x=>({id:x.id,name:x.name,personality:x.personality,speech_style:x.speech_style,examples:x.examples})))}
+输出格式：
+{"dialogs":[{"id":"d_q_1_01_accept","quest_id":"q_1_01","stage":"accept","nodes":[{"node_id":"n1","speaker":"","text":"","condition":null,"options":[{"text":"","next":"n2","effects":[{"type":"accept_quest"}]},{"text":"","next":"n3","effects":[{"type":"accept_quest"},{"type":"set_flag","flag":"attitude_x","value":true}]}]},{"node_id":"n2","speaker":"","text":"","condition":null,"options":[{"text":"继续","next":null,"effects":[]}]}]}]}`}
+  if(n===8)return `${head}
+任务：生成地图表、事件表和场景美术需求单。地图 ${v.map_count} 张，类型覆盖：${v.map_types}；每张地图 size 用 "宽x高" 格子数（村庄 30x20 左右，地牢更长）；layout 用文字描述分区；connections 列出相连地图及解锁条件。事件表把 NPC 放到其 location 对应的地图，把 troops 放到任务发生的地图，加上宝箱（给物品 id）、传送点和任务触发器。美术需求单只列场景类单张图：每张地图一张背景、每个 boss 一张形象图（角色立绘已在环节 3 设计，不要重复）；行走图和图块写 asset_pack 来源建议而不是生成。美术风格：${v.art_style}${T.design.style_guide?'，风格指南：'+trimJson(T.design.style_guide,2000):''}。
+【地点】${trimJson(T.world.locations)}
+【NPC】${trimJson(T.npcs.map(x=>({id:x.id,name:x.name,location:x.location,function:x.function,appearance:x.appearance})))}
+【任务】${trimJson(T.quests.map(q=>({id:q.id,location_id:q.location_id,troop_id:q.troop_id,giver_npc:q.giver_npc})))}
+【敌群】${trimJson(T.troops.map(t=>({id:t.id,name:t.name})))}
+【物品 id】${trimJson(T.items.map(i=>i.id))}
+输出格式：
+{"maps":[{"id":"map_village","name":"","type":"村庄","size":"30x20","tileset":"素材包里的图块集建议","layout":"","location_ids":["loc_x"],"connections":[{"to":"map_x","unlock":"flag 或空"}]}],"events":[{"id":"e_001","map_id":"map_x","x":5,"y":7,"type":"npc","ref":"npc_x","trigger":"interact","action":"open_dialog"},{"id":"e_002","map_id":"map_x","x":12,"y":3,"type":"troop","ref":"tr_x","trigger":"touch","action":"battle"},{"id":"e_003","map_id":"map_x","x":2,"y":2,"type":"chest","ref":"it_x","trigger":"interact","action":"give_item"},{"id":"e_004","map_id":"map_x","x":29,"y":10,"type":"transfer","ref":"map_y","trigger":"touch","action":"transfer"}],"art":[{"target":"npc_x","type":"portrait","desc":"","style":""},{"target":"map_x","type":"background","desc":"","style":""}],"asset_packs":[{"use":"行走图","suggest":"RPG Maker MZ 自带或 Kenney"}]}`;
+  if(n===9)return `${head}
+任务：做一致性检查，不生成新内容。检查：人物设定前后矛盾、地点描述矛盾、台词风格与 speech_style 不符、分支没有汇合、任务目标和事件结果不一致。每条问题给出环节号（1-8）和修改建议。最多 15 条，没有问题就返回空数组。
+【世界设定】${trimJson(T.world,15000)}
+【NPC】${trimJson(T.npcs,15000)}
+【章节】${trimJson(T.chapters,15000)}
+【任务】${trimJson(T.quests,20000)}
+【对白】${trimJson(T.dialogs,40000)}
+输出格式：
+{"issues":[{"stage":6,"severity":"warn","msg":"","fix":""}]}`;
+}
+
+/* ---------- human edits: remembered per row, kept across regenerations ---------- */
+const KEYF=['id','node_id','name','npc_id','target','use'];
+const rowKey=r=>{if(!r||typeof r!=='object')return null;for(const k of KEYF)if(r[k]!=null&&r[k]!=='')return String(r[k]);return null};
+function stMeta(n){const st=S.stages[n]=S.stages[n]||{};st.meta=st.meta||{runs:0,edited:{}};st.meta.edited=st.meta.edited||{};return st.meta}
+function markEdited(n,table,key){if(key==null)return;const m=stMeta(n);m.edited[table]=m.edited[table]||{};m.edited[table][key]=Date.now()}
+function editedCount(n){const m=S.stages[n]?.meta?.edited||{};return Object.values(m).reduce((a,o)=>a+Object.keys(o).length,0)}
+function rowsOf(n,data,table){if(!data)return null;if(n===4&&table==='events')return (data.chapters||[]).flatMap(c=>c.events||[]);return Array.isArray(data[table])?data[table]:null}
+function diffEdits(n,oldData,newData){
+  if(!oldData||!newData)return 0;let c=0;const keys=new Set([...Object.keys(oldData),...Object.keys(newData)]);if(n===4)keys.add('events');
+  for(const k of keys){const a=rowsOf(n,oldData,k),b=rowsOf(n,newData,k);if(!a||!b)continue;const am=new Map(a.map(r=>[rowKey(r),JSON.stringify(r)]));b.forEach(r=>{const key=rowKey(r);if(key==null)return;if(am.get(key)!==JSON.stringify(r)){markEdited(n,k,key);c++}})}
+  return c;
+}
+function mergeKeep(n,oldData,newData){
+  const ed=S.stages[n]?.meta?.edited||{};let kept=0;
+  for(const [table,keys] of Object.entries(ed)){const ks=Object.keys(keys);if(!ks.length)continue;const a=rowsOf(n,oldData,table);if(!a)continue;const old=new Map(a.map(r=>[rowKey(r),r]));
+    if(n===4&&table==='events'){(newData.chapters||[]).forEach(ch=>{ch.events=(ch.events||[]).map(e=>{const k=rowKey(e);if(k!=null&&keys[k]&&old.has(k)){kept++;return clone(old.get(k))}return e})})}
+    else if(Array.isArray(newData[table])){const seen=new Set();newData[table]=newData[table].map(r=>{const k=rowKey(r);if(k!=null&&keys[k]&&old.has(k)){seen.add(k);kept++;return clone(old.get(k))}return r});ks.forEach(k=>{if(!seen.has(k)&&old.has(k)){newData[table].push(clone(old.get(k)));kept++}})}}
+  return kept;
+}
+function coerce(orig,txt){const t=txt.trim();if(typeof orig==='number')return t===''?null:(isNaN(Number(t))?txt:Number(t));if(typeof orig==='boolean')return /^(true|是|1|y)$/i.test(t);if(orig==null)return t===''?null:(/^-?\d+(\.\d+)?$/.test(t)?Number(t):txt);return txt}
+function commitCell(n,td){
+  const st=S.stages[n];if(!st?.data)return;const rows=rowsOf(n,st.data,td.dataset.t);if(!rows)return;const row=rows.find(r=>rowKey(r)===td.dataset.rid);if(!row)return;
+  const c=td.dataset.c;const val=coerce(row[c],td.textContent);if(JSON.stringify(val)===JSON.stringify(row[c]))return;
+  row[c]=val;markEdited(n,td.dataset.t,td.dataset.rid);const tr=td.closest('tr');if(tr)tr.classList.add('edited');st.updatedAt=Date.now();saveStage(n);const m=$('#metaLine');if(m)m.innerHTML=metaHtml(n);toast('已改并保存，重生成时会保留这一行');
+}
+function commitDialogEdit(el){
+  const st=S.stages[7];if(!st?.data)return;const d=(st.data.dialogs||[]).find(x=>x.id===el.dataset.d);if(!d)return;const nd=(d.nodes||[]).find(x=>x.node_id===el.dataset.n);if(!nd)return;
+  const f=el.dataset.f,txt=el.textContent.trim();let changed=false;
+  if(f==='speaker'){if(nd.speaker!==txt){nd.speaker=txt;changed=true}}
+  else if(f==='text'){if(nd.text!==txt){nd.text=txt;changed=true}}
+  else if(f==='opt'){const o=(nd.options||[])[Number(el.dataset.i)];if(o&&o.text!==txt){o.text=txt;changed=true}}
+  if(!changed)return;markEdited(7,'dialogs',d.id);st.updatedAt=Date.now();saveStage(7);const m=$('#metaLine');if(m)m.innerHTML=metaHtml(7);toast('已改并保存，重生成时会保留这段对白');
+}
+
+/* ---------- structure check (quality gate per stage) ---------- */
+const REQ={1:{title:'string',locations:['id','name'],factions:['id','name'],conflict:'string'},2:{hero:'object',npcs:['id','name','location','function']},3:{style_guide:'object',characters:['id','name']},4:{chapters:['id','title'],endings:['id','name']},5:{skills:['id','name'],items:['id','name','kind'],enemies:['id','name'],troops:['id','members'],states:['id','name'],curve:'object'},6:{quests:['id','name','kind','giver_npc'],flags:['name']},7:{dialogs:['id','quest_id','stage','nodes']},8:{maps:['id','name'],events:['id','map_id','type'],art:['target','type']}};
+function schemaCheck(n,data){
+  const iss=[];const add=(severity,msg,where)=>iss.push({stage:n,severity,msg,where,kind:'结构'});const v=S.P.inputs.vars;const noCombat=v.combat==='无战斗';
+  if(!data||typeof data!=='object'||Array.isArray(data)){add('error','产出不是 JSON 对象');return iss}
+  for(const [k,spec] of Object.entries(REQ[n]||{})){
+    if(Array.isArray(spec)){const arr=data[k];if(!Array.isArray(arr)){add('error',`缺少 ${k} 表`);continue}
+      if(!arr.length&&!(noCombat&&['skills','enemies','troops'].includes(k)))add('error',`${k} 表是空的`);
+      const seen=new Set();arr.forEach((r,i)=>{const key=rowKey(r);if(r&&r.id!=null){if(seen.has(key))add('error',`${k} 里 id ${key} 重复`,{table:k,id:key});seen.add(key)}spec.forEach(f=>{const val=r?.[f];if(val==null||val===''||(Array.isArray(val)&&!val.length))add('error',`${k} 第 ${i+1} 行${key?'（'+key+'）':''}缺少 ${f}`,{table:k,id:key})})});}
+    else if(spec==='string'){if(typeof data[k]!=='string'||!data[k].trim())add('error',`缺少 ${k}`)}
+    else if(spec==='object'){if(!data[k]||typeof data[k]!=='object')add('error',`缺少 ${k}`)}
+  }
+  const N=k=>Number(v[k])||0;
+  if(n===1){const L=(data.locations||[]).length;if(L<N('map_count'))add('warn',`地点只有 ${L} 个，少于地图数 ${v.map_count}`)}
+  if(n===2){const c=(data.npcs||[]).length;if(c>N('npc_max'))add('warn',`NPC ${c} 个，超过上限 ${v.npc_max}`);if(!(data.npcs||[]).some(x=>x.function==='quest_giver'))add('error','没有任何 quest_giver，任务会无人发布');if(v.economy==='有货币和商店'&&!(data.npcs||[]).some(x=>x.function==='merchant'))add('warn','有商店但没有 merchant')}
+  if(n===3){if(!(data.characters||[]).some(c=>c.id==='hero'))add('warn','形象卡里没有主角（id 应为 hero）')}
+  if(n===4){const ch=(data.chapters||[]).length;if(ch!==N('chapters'))add('warn',`章节 ${ch} 章，变量要求 ${v.chapters} 章`);const evs=(data.chapters||[]).flatMap(c=>(c.events||[]).map(e=>({c,e})));const m=evs.filter(x=>x.e.kind==='main').length;if(m!==N('main_quests'))add('warn',`主线事件 ${m} 个，变量要求 ${v.main_quests} 个`);const en=(data.endings||[]).length;if(en!==N('endings'))add('warn',`结局 ${en} 个，变量要求 ${v.endings} 个`);evs.forEach(({c,e})=>{if(!e.id||!e.title)add('error',`章节 ${c.id} 有事件缺少 id 或 title`,{table:'events',id:e.id})});if(!(data.endings||[]).some(e=>!e.condition||!String(e.condition).trim()))add('warn','没有默认结局（condition 为空的那个），flag 都不满足时试玩会落到第一个结局')}
+  if(n===5){if(!noCombat){const b=(data.enemies||[]).filter(e=>e.boss).length;if(b<N('chapters'))add('warn',`boss 只有 ${b} 个，少于章节数 ${v.chapters}`);const w=(data.items||[]).filter(i=>i.kind==='weapon').length;if(!w)add('warn','没有武器')}if(data.curve&&Array.isArray(data.curve.chapter_mult)&&data.curve.chapter_mult.length<N('chapters'))add('warn','curve.chapter_mult 长度少于章节数')}
+  if(n===6){const qs=data.quests||[];const m=qs.filter(q=>q.kind==='main').length;if(m!==N('main_quests'))add('warn',`主线任务 ${m} 个，变量要求 ${v.main_quests} 个`);qs.forEach(q=>{const steps=stepsOf(q);if(!steps.length)add('error',`任务 ${q.id} 没有分步目标`,{table:'quests',id:q.id});if(noCombat&&steps.some(s=>s.type==='kill'))add('error',`无战斗设定下任务 ${q.id} 有击杀目标`,{table:'quests',id:q.id});if(!q.deliver_npc)add('warn',`任务 ${q.id} 没有交付 NPC，会按发布者交付`,{table:'quests',id:q.id})});if(qs.length&&!qs.some(q=>q.kind==='main'&&!(q.prereq_flags||[]).length))add('error','没有一个无前置的主线任务，试玩无法开始')}
+  if(n===7){(data.dialogs||[]).forEach(d=>{if(!['accept','deliver'].includes(d.stage))add('error',`对白 ${d.id} 的 stage 必须是 accept 或 deliver`,{table:'dialogs',id:d.id});(d.nodes||[]).forEach(nd=>{if(!nd.node_id)add('error',`对白 ${d.id} 有节点缺少 node_id`,{table:'dialogs',id:d.id});if(!nd.text)add('error',`对白 ${d.id} 节点 ${nd.node_id} 没有台词`,{table:'dialogs',id:d.id})})})}
+  if(n===8){const m=(data.maps||[]).length;if(m!==N('map_count'))add('warn',`地图 ${m} 张，变量要求 ${v.map_count} 张`)}
+  return iss;
+}
+function stageIssues(n){const st=S.stages[n];if(!st||!st.data)return [];return [...schemaCheck(n,st.data),...validate().filter(i=>i.stage===n).map(i=>({...i,kind:'引用'}))]}
+
+/* ---------- AI stage run ---------- */
+async function runStage(n,opts={}){
+  if(!S.sample){toast('还没有可用的文本模型，点右上角"⚙ 设置"');return}
+  if(S.running!=null)return;
+  S.running=n;S.ctl=new AbortController();setStatus(n,'run');render();
+  const box=$('#stream');let raw='';const prompt=promptFor(n,opts);const t0=Date.now();
+  try{
+    const data=await S.sample.json(prompt,{signal:S.ctl.signal,modelTier:S.tier,cache:false,onText:({text})=>{raw=text;if(box){box.textContent=text;box.scrollTop=box.scrollHeight}}});
+    if(n===9){S.stages[9]=Object.assign({},S.stages[9]||{},{ai:Array.isArray(data.issues)?data.issues:[],aiAt:Date.now(),aiMs:Date.now()-t0});setStatus(9,stOf(9)==='done'?'done':'')}
+    else{
+      const old=S.stages[n]?.data;let newData=data;
+      if(n===3&&old?.characters){(newData.characters||[]).forEach(c=>{const o=old.characters.find(x=>x.id===c.id);if(o&&o.portrait_id)c.portrait_id=o.portrait_id})}
+      if(n===7&&opts.quests&&old){const sub=new Set(opts.quests.map(q=>q.id));newData=Object.assign({},old,{dialogs:[...(old.dialogs||[]).filter(d=>!sub.has(d.quest_id)),...(data.dialogs||[])]})}
+      const kept=old?mergeKeep(n,old,newData):0;
+      const meta=stMeta(n);meta.runs=(meta.runs||0)+1;meta.lastMs=Date.now()-t0;meta.totalMs=(meta.totalMs||0)+meta.lastMs;meta.lastAt=Date.now();meta.lastIn=prompt.length;meta.lastOut=raw.length;meta.lastKept=kept;meta.partial=opts.quests?('只重生成了 '+opts.label):'';
+      S.stages[n]={data:newData,raw,updatedAt:Date.now(),meta};
+      const errs=schemaCheck(n,newData).filter(i=>i.severity==='error').length;setStatus(n,errs?'fix':'ok');
+      if(kept)toast(`保留了 ${kept} 行人工修改`);
+    }
+    await saveStage(n);toast('环节 '+n+' 生成完成');
+  }catch(e){
+    const code=e&&e.code;
+    if(code==='cancelled'){setStatus(n,S.stages[n]?.data?'ok':'')}
+    else{setStatus(n,'fix');S.stages[n]=Object.assign({},S.stages[n]||{},{error:code+'：'+(e.message||''),raw:e.text||raw})}
+    if(code==='not_granted'){S.sample=null}
+  }
+  S.running=null;S.ctl=null;render();
+}
+function metaHtml(n){const m=S.stages[n]?.meta;if(!m||!m.runs)return '';const s=ms=>ms>=1000?(ms/1000).toFixed(ms>=10000?0:1)+' 秒':ms+' 毫秒';return `<span>已生成 <b>${m.runs}</b> 次</span><span>上次耗时 <b>${s(m.lastMs||0)}</b>${m.runs>1?`，累计 ${s(m.totalMs||0)}`:''}</span><span>上次 prompt <b>${m.lastIn||0}</b> 字，回复 <b>${m.lastOut||0}</b> 字</span><span>人工改过 <b>${editedCount(n)}</b> 行${m.lastKept?`，上次重生成保留了 ${m.lastKept} 行`:''}</span>${m.partial?`<span>${esc(m.partial)}</span>`:''}`}
+
+/* ---------- validation + simulation ---------- */
+function stepsOf(q){if(!q)return [];if(Array.isArray(q.steps)&&q.steps.length)return q.steps.filter(Boolean);return q.objective?[q.objective]:[]}
+function validate(){
+  const T=tables(),iss=[];const add=(stage,severity,msg,where)=>iss.push({stage,severity,msg,where});
+  const locIds=new Set((T.world.locations||[]).map(l=>l.id)),npcIds=new Set(T.npcs.map(x=>x.id)),itemIds=new Set(T.items.map(x=>x.id)),troopIds=new Set(T.troops.map(x=>x.id)),enemyIds=new Set(T.enemies.map(x=>x.id)),mapIds=new Set(T.maps.map(m=>m.id)),skillIds=new Set(T.skills.map(s=>s.id));
+  const flagDef=new Set(T.flags.map(f=>f.name));const flagWritten=new Set();
+  if(!S.stages[1])add(1,'error','世界设定表还没有生成');
+  T.npcs.forEach(x=>{if(x.location&&!locIds.has(x.location))add(2,'error',`NPC ${x.name||x.id} 的地点 ${x.location} 不在地点表里`,{table:'npcs',id:x.id})});
+  if(S.stages[3]?.data){const dIds=new Set((T.design.characters||[]).map(c=>c.id));T.npcs.forEach(x=>{if(!dIds.has(x.id))add(3,'warn',`NPC ${x.name||x.id} 没有形象卡`,{table:'characters',id:x.id})})}
+  T.chapters.forEach(c=>(c.events||[]).forEach(e=>{if(e.location&&!locIds.has(e.location))add(4,'error',`事件 ${e.id} 的地点 ${e.location} 不存在`,{table:'events',id:e.id});(e.npcs||[]).forEach(id=>{if(!npcIds.has(id))add(4,'error',`事件 ${e.id} 引用的 NPC ${id} 不存在`,{table:'events',id:e.id})})}));
+  T.troops.forEach(t=>(t.members||[]).forEach(m=>{if(!enemyIds.has(m))add(5,'error',`敌群 ${t.id} 的成员 ${m} 不在敌人表`,{table:'troops',id:t.id})}));
+  T.enemies.forEach(e=>(e.drops||[]).forEach(d=>{if(d.item_id&&!itemIds.has(d.item_id))add(5,'warn',`敌人 ${e.id} 掉落的 ${d.item_id} 不在物品表`,{table:'enemies',id:e.id})}));
+  T.classes.forEach(c=>(c.trees||[]).forEach(t=>(t.nodes||[]).forEach(nd=>{if(nd.skill_id&&!skillIds.has(nd.skill_id))add(5,'warn',`技能树节点 ${nd.node_id} 指向的技能 ${nd.skill_id} 不存在`,{table:'classes',id:c.id})})));
+  T.shops.forEach(s=>{if(s.npc_id&&!npcIds.has(s.npc_id))add(5,'error',`商店的 NPC ${s.npc_id} 不存在`,{table:'shops',id:s.npc_id});(s.items||[]).forEach(id=>{if(!itemIds.has(id))add(5,'warn',`商店 ${s.npc_id} 卖的 ${id} 不在物品表`,{table:'shops',id:s.npc_id})})});
+  const qIds=new Set(T.quests.map(q=>q.id));
+  T.quests.forEach(q=>{const w={table:'quests',id:q.id};
+    if(q.giver_npc&&!npcIds.has(q.giver_npc))add(6,'error',`任务 ${q.id} 的发布 NPC ${q.giver_npc} 不存在`,w);
+    if(q.deliver_npc&&!npcIds.has(q.deliver_npc))add(6,'error',`任务 ${q.id} 的交付 NPC ${q.deliver_npc} 不存在`,w);
+    if(q.location_id&&!locIds.has(q.location_id))add(6,'error',`任务 ${q.id} 的地点 ${q.location_id} 不存在`,w);
+    stepsOf(q).forEach((s,i)=>{const tid=s.target_id||(s.type==='kill'?q.troop_id:null);const ok={kill:troopIds,talk:npcIds,reach:locIds,collect:itemIds}[s.type];if(!ok)add(6,'warn',`任务 ${q.id} 第 ${i+1} 步的类型 ${s.type||'(空)'} 不是 kill/collect/talk/reach`,w);else if(!tid||!ok.has(tid))add(6,s.type==='kill'?'error':'warn',`任务 ${q.id} 第 ${i+1} 步（${s.type}）的目标 ${tid||'(空)'} 不存在`,w)});
+    (q.reward?.item_ids||[]).forEach(id=>{if(!itemIds.has(id))add(6,'error',`任务 ${q.id} 奖励的物品 ${id} 不存在`,w)});
+    (q.prereq_flags||[]).forEach(f=>{if(!flagDef.has(f))add(6,'error',`任务 ${q.id} 的前置 flag ${f} 没有在 flag 表定义`,w)});
+    (q.set_flags||[]).forEach(f=>{flagWritten.add(f.flag);if(!flagDef.has(f.flag))add(6,'warn',`任务 ${q.id} 写入的 flag ${f.flag} 没有在 flag 表定义`,{table:'flags',id:f.flag})});
+    if(q.next_quest_id&&!qIds.has(q.next_quest_id))add(6,'error',`任务 ${q.id} 的后续任务 ${q.next_quest_id} 不存在`,w);
+  });
+  T.dialogs.forEach(d=>{const w={table:'dialogs',id:d.id};(d.nodes||[]).forEach(nd=>{(nd.options||[]).forEach(o=>{if(o.next&&!(d.nodes||[]).some(x=>x.node_id===o.next))add(7,'error',`对白 ${d.id} 的选项跳转 ${o.next} 不存在`,w);(o.effects||[]).forEach(ef=>{if(ef.type==='set_flag')flagWritten.add(ef.flag)})})});if(d.quest_id&&!qIds.has(d.quest_id))add(7,'error',`对白 ${d.id} 对应的任务 ${d.quest_id} 不存在`,w)});
+  (S.stages[4]?.data?.endings||[]).forEach(e=>{String(e.condition||'').split('&&').map(s=>s.trim()).filter(Boolean).forEach(c=>{const m=c.match(/^!?\s*([\w\.]+)/);if(m&&T.flags.length&&!flagDef.has(m[1]))add(4,'warn',`结局 ${e.id} 的条件用到的 flag ${m[1]} 没有在 flag 表定义`,{table:'endings',id:e.id})})});
+  T.quests.forEach(q=>{(q.prereq_flags||[]).forEach(f=>{if(!flagWritten.has(f))add(6,'warn',`任务 ${q.id} 的前置 flag ${f} 没有任何任务或选项写入它，会永远接不到`,{table:'quests',id:q.id})});['accept','deliver'].forEach(st=>{if(T.dialogs.length&&!T.dialogs.some(d=>d.quest_id===q.id&&d.stage===st))add(7,'warn',`任务 ${q.id} 缺少 ${st} 对白`,{table:'dialogs',id:'d_'+q.id+'_'+st})})});
+  T.maps.forEach(m=>(m.connections||[]).forEach(c=>{if(c.to&&!mapIds.has(c.to))add(8,'error',`地图 ${m.id} 连接到不存在的 ${c.to}`,{table:'maps',id:m.id})}));
+  T.events.forEach(e=>{const w={table:'events',id:e.id};if(!mapIds.has(e.map_id))add(8,'error',`事件 ${e.id} 放在不存在的地图 ${e.map_id}`,w);const ok={npc:npcIds,troop:troopIds,chest:itemIds,transfer:mapIds}[e.type];if(ok&&e.ref&&!ok.has(e.ref))add(8,'error',`事件 ${e.id}（${e.type}）引用的 ${e.ref} 不存在`,w)});
+  if(T.maps.length)T.npcs.forEach(x=>{if(!T.events.some(e=>e.type==='npc'&&e.ref===x.id))add(8,'warn',`NPC ${x.name||x.id} 没有放到任何地图上`,{table:'events'})});
+  return iss;
+}
+function simulate(){
+  const T=tables();if(!T.quests.length||!T.enemies.length)return {rows:[],issues:[{stage:9,severity:'info',msg:'需要先生成玩法数据和任务表才能模拟'}]};
+  let L=1,xp=0,wTier=0,aTier=0,potions=0;const rows=[],issues=[];const c=curve();
+  const order=[...T.quests].sort((a,b)=>(Number(a.level)||1)-(Number(b.level)||1)||(a.kind==='main'?-1:1));
+  for(const q of order){
+    let note='',win=true,hpLeft=1;
+    const kills=stepsOf(q).filter(s=>s.type==='kill').map(s=>s.target_id||q.troop_id).filter(Boolean);
+    for(const tid of kills){
+      const tr=byId(T.troops,tid);const ps=playerStats(L,wTier,aTier);let hp=ps.hp;let rounds=0;
+      const members=(tr?.members||[]).map(id=>byId(T.enemies,id)).filter(Boolean);
+      if(!members.length){note='敌群为空';continue}
+      for(const e of members){const es=enemyStats(e);let ehp=es.hp;const dmgOut=Math.max(1,ps.atk-es.def),dmgIn=Math.max(1,es.atk-ps.def);
+        while(ehp>0&&hp>0){ehp-=dmgOut;rounds++;if(ehp>0)hp-=dmgIn;}
+        if(hp<=0){win=false;break}
+        xp+=es.xp;
+      }
+      hpLeft=Math.max(0,hp)/ps.hp;
+      if(!win){issues.push({stage:5,severity:'error',msg:`任务 ${q.id}（建议 ${q.level} 级，模拟 ${L} 级）打不过敌群 ${tid}：请降低敌人倍率或提高奖励经验`,where:{table:'troops',id:tid}});note=`战败于 ${tr?.name||tid}，共 ${rounds} 回合`;break}
+      else{note=(note?note+'；':'')+`胜 ${tr?.name||tid}，${rounds} 回合，剩 ${Math.round(hpLeft*100)}% HP`;if(hpLeft>0.85)issues.push({stage:5,severity:'warn',msg:`任务 ${q.id} 对 ${tr?.name||tid} 的战斗过于轻松（剩 ${Math.round(hpLeft*100)}% HP）`,where:{table:'troops',id:tid}})}
+    }
+    xp+=questXp(q);
+    (q.reward?.item_ids||[]).forEach(id=>{const it=byId(T.items,id);if(!it)return;if(it.kind==='weapon')wTier=Math.max(wTier,Number(it.tier)||1);if(it.kind==='armor')aTier=Math.max(aTier,Number(it.tier)||1);if(it.effect_type==='heal_hp')potions++});
+    while(xp>=xpNeed(L)&&L<Number(S.P.inputs.vars.level_cap||99)){xp-=xpNeed(L);L++}
+    rows.push({quest:q.name||q.id,kind:q.kind,steps:stepsOf(q).map(s=>s.type).join('→'),level_suggest:q.level,level_sim:L,result:kills.length?(win?'胜':'败'):'无战斗',note});
+    if(win&&q.level&&L<Number(q.level)-1)issues.push({stage:6,severity:'warn',msg:`做完 ${q.id} 后玩家只有 ${L} 级，低于下一步建议等级，经验奖励偏少`,where:{table:'quests',id:q.id}});
+  }
+  return {rows,issues};
+}
+
+/* ---------- rendering ---------- */
+function render(){
+  renderRail();
+  $('#ttl').textContent=S.P?S.P.name:'RPG 工坊';
+  $('#btnPlay').disabled=!S.P;$('#btnExport').disabled=!S.P;
+  const w=$('#work');
+  if(!S.P){w.innerHTML=`<div class="empty"><h2>从一个点子开始做一个 RPG</h2><p>新建项目后，第 0 步会带着你填：世界的点子、一段故事骨架、几个决定游戏多大的选项。之后每一步都是"点生成、看结果、通过"。</p><div class="row" style="justify-content:center"><button class="btn primary" id="btnNew2">新建项目</button><button class="btn" id="btnHelp2">先看新手指南</button></div></div>`;$('#btnNew2').onclick=newProject;$('#btnHelp2').onclick=()=>{$('#help').hidden=false};return}
+  if(S.play){renderPlay();return}
+  const n=S.cur;
+  if(n===0)renderInputs();else if(n===9)renderCheck();else if(n===10)renderBuild();else renderAIStage(n);
+}
+const doneCount=p=>Object.values((p&&p.statuses)||{}).filter(s=>s==='done').length;
+function renderRail(){
+  $('#projList').innerHTML=S.projects.map(p=>{const cur=p.id===S.pid;const st=cur?S.P.statuses:p.statuses;const n=Object.values(st||{}).filter(s=>s==='done').length;
+    if(S.confirmDel===p.id)return `<div class="confirm"><span>删除「${esc(p.name)}」？</span><button class="btn ghost" data-del="${esc(p.id)}" style="color:var(--bad)">删除</button><button class="btn ghost" data-undel="1">取消</button></div>`;
+    return `<div class="proj ${cur?'on':''}" data-id="${esc(p.id)}" role="button" tabindex="0"><span class="nm">${esc(p.name)}</span><span class="pr">${n}/${STAGES.length}</span><button class="x" data-x="${esc(p.id)}" title="删除项目">×</button></div>`}).join('')||'<div class="hint" style="padding:4px 8px">暂无项目</div>';
+  document.querySelectorAll('.proj').forEach(b=>{const open=async()=>{if(b.dataset.id===S.pid)return;await loadProject(b.dataset.id);S.cur=0;S.play=null;render()};b.onclick=e=>{if(e.target.closest('.x'))return;open()};b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});
+  document.querySelectorAll('[data-x]').forEach(b=>b.onclick=e=>{e.stopPropagation();S.confirmDel=b.dataset.x;renderRail()});
+  document.querySelectorAll('[data-undel]').forEach(b=>b.onclick=()=>{S.confirmDel=null;renderRail()});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteProject(b.dataset.del));
+  const done=S.P?doneCount(S.P):0;
+  $('#steps').innerHTML=`<div class="prog"><i style="width:${Math.round(done/STAGES.length*100)}%"></i></div><div class="pages">`+STAGES.map(s=>{const st=S.P?stOf(s.n):'';const lock=S.P&&!unlocked(s.n);const label={done:'已通过',ok:'待审核',run:'生成中',fix:'需修改'}[st]||(lock?'未解锁':(s.ai?'AI 生成':''));return `<button class="pg ${S.cur===s.n&&!S.play?'on':''} ${st} ${lock?'locked':''}" data-n="${s.n}" title="${esc(s.out)}"><span class="num">${st==='done'?'✓':s.n}</span><span class="nm">${esc(s.name)}</span><span class="lb">${label}</span></button>`}).join('')+`</div>`;
+  document.querySelectorAll('.pg').forEach(b=>b.onclick=()=>{if(!S.P)return;S.cur=Number(b.dataset.n);S.play=null;S.hl=null;render();const on=$('.pg.on');if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'nearest'})});
+}
+async function deleteProject(pid){
+  S.confirmDel=null;
+  if(S.db){try{const st=await S.db.collection('projects/'+pid+'/stages').get();for(const d of st.docs){await S.db.doc('projects/'+pid+'/stages/'+d.id).delete()}await S.db.doc('projects/'+pid).delete()}catch(e){toast('删除失败：'+(e.code||''));return}}
+  else{const o=lsRead();if(o.projects)delete o.projects[pid];lsWrite(o)}
+  if(S.pid===pid){S.P=null;S.pid=null;S.stages={};S.play=null;S.cur=0}
+  await listProjects();if(!S.P&&S.projects.length)await loadProject(S.projects[0].id);
+  toast('已删除');render();
+}
+function guideBox(n){const g=GUIDES[n];if(!g)return '';return `<div class="guide"><div><div class="gl">这一步在做什么</div><p>${esc(g.what)}</p></div><div><div class="gl">你要看什么</div><ul>${g.check.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></div></div>`}
+/* variable constraints: checked live while the person types */
+function varHints(v){
+  const h=[];const H=(lvl,msg)=>h.push({lvl,msg});const n=k=>Number(v[k])||0;
+  const total=n('main_quests')+n('side_quests'),lo=Math.round(n('hours')*4),hi=Math.round(n('hours')*6);
+  H(total<lo||total>hi?'warn':'ok',`时长 ${v.hours} 小时约对应 ${lo}–${hi} 个任务，现在主线 ${n('main_quests')} + 支线 ${n('side_quests')} = ${total} 个${total<lo?'，偏少，可以加支线':total>hi?'，偏多，生成和平衡都会更久':'，合适'}`);
+  if(n('chapters')>n('main_quests'))H('error',`章节数 ${v.chapters} 不能多于主线任务数 ${v.main_quests}：每章至少要有一个主线任务`);
+  if(n('main_quests')<1)H('error','主线任务至少 1 个');
+  if(v.branch==='无分支'&&n('endings')!==1)H('error','无分支时结局数必须是 1');
+  if(v.branch==='多结局'&&n('endings')<2)H('error','选了多结局，结局数至少 2');
+  if(v.branch==='小分支大汇合'&&n('endings')>2)H('warn','小分支大汇合一般 1–2 个结局；更多结局会让后半段的任务和对白成倍增加');
+  const giv=Math.max(2,Math.ceil(n('main_quests')/3));if(n('npc_max')<giv+1)H('warn',`NPC 上限 ${v.npc_max} 偏少：至少需要 ${giv} 个任务发布者，再加反派`+(v.economy==='有货币和商店'?'和商人':''));
+  if(v.combat==='无战斗')H('info','无战斗：不生成敌人、敌群和技能，任务目标只用对话 / 寻物 / 到达，环节 9 的数值模拟会跳过战斗');
+  if(n('party')>1)H('info',`队伍 ${v.party} 人：环节 2 会生成可加入的同伴，但文本试玩和数值模拟仍按单人计算`);
+  if(n('level_cap')>n('hours')*12)H('warn',`等级上限 ${v.level_cap} 对 ${v.hours} 小时的游戏偏高，升级会很慢，建议不超过 ${n('hours')*12}`);
+  if(n('level_cap')<n('chapters')*3)H('warn',`等级上限 ${v.level_cap} 偏低，${v.chapters} 章至少留 ${n('chapters')*3} 级的成长空间`);
+  const mt=String(v.map_types||'').split(/[、,，/\s]+/).filter(Boolean).length;if(mt>n('map_count'))H('warn',`区域类型有 ${mt} 种，但地图只有 ${v.map_count} 张，有的类型不会出现`);
+  if(n('trees')*n('tree_depth')>16)H('warn',`每职业 ${n('trees')*n('tree_depth')} 个技能偏多，生成和平衡都会更费时间`);
+  if(!String(v.content_limit||'').trim())H('warn','内容限制为空：至少写一个年龄分级，它会进入每个环节的 prompt');
+  if(v.economy==='无'&&v.combat!=='无战斗')H('info','无经济：任务奖励不会有金币，商店表为空');
+  return h;
+}
+function hintsHtml(v){return varHints(v).map(h=>`<div class="hint-l ${h.lvl}">${h.lvl==='error'?'✕ ':h.lvl==='warn'?'! ':h.lvl==='ok'?'✓ ':'· '}${esc(h.msg)}</div>`).join('')}
+function renderInputs(){
+  const I=S.P.inputs,v=I.vars;const isExample=I.idea.startsWith('示例')||I.skeleton.startsWith('示例');
+  $('#work').innerHTML=`<h2>0 · 输入与定变量</h2><p class="lead">做一个 RPG 只需要你准备三样东西：一个世界的点子、一段你想让玩家经历的故事、几个决定游戏多大的选项。剩下的设定、任务、对白、数值都由后面的环节生成。</p>
+  ${isExample?'<div class="status">现在填的是示例内容，可以直接用它先跑一遍流程看看效果，也可以整段替换成你自己的。</div>':''}
+  <div class="card"><label class="f"><span>项目名</span><input type="text" id="pname" value="${esc(S.P.name)}"></label>
+  <div class="guide"><div><div class="gl">什么是世界观 idea</div><p>一两段话，说清三件事：这个世界和现实哪里不一样；谁和谁在争什么（核心冲突）；主角是谁、被怎么卷进来。不用写剧情。</p></div><div><div class="gl">怎么写才好用</div><ul><li>有一个具体的地方，比如"被潮汐封锁的港口城"，比"奇幻大陆"好</li><li>冲突要能打起来、能选边，后面的任务和分支都从它长出来</li><li>给一两个只有这个世界才有的东西（潮语、旧神），AI 会围绕它们扩写</li></ul></div></div>
+  <label class="f"><span>世界观 idea</span><textarea id="idea">${esc(I.idea)}</textarea></label>
+  <div class="guide"><div><div class="gl">什么是故事骨架</div><p>你希望玩家按顺序经历的大事，300–500 字。按章写，每章 1–3 件事，最后写结局怎么分。这一段必须由人来写：AI 不会替你编剧情，只会把它扩成设定、任务和对白。</p></div><div><div class="gl">检查清单</div><ul><li>主角想要什么（动机）写了吗</li><li>每章有没有一个"发现"或"转折"</li><li>结局的分叉对应某个玩家要做的选择吗</li></ul><div class="row" style="margin-top:6px"><button class="btn ghost" id="btnTpl">插入填空模板</button><button class="btn ghost" id="btnAsk" ${S.sample?'':'disabled'}>让 AI 给我的骨架提问题</button></div></div></div>
+  <label class="f"><span>故事骨架（也可以粘贴一章小说）</span><textarea id="skel" style="min-height:160px">${esc(I.skeleton)}</textarea></label>
+  <div id="askOut"></div></div>
+  <div class="card"><h3 style="margin-top:0">变量：决定游戏多大、怎么玩</h3><p class="hint" style="margin:0 0 8px">不确定就用预设，每一项下面都有解释。这些值是后面每个环节的约束，AI 会在这个范围内生成。</p>
+  <div class="row" style="margin-bottom:12px"><span class="hint">预设：</span>${Object.keys(PRESETS).map(k=>`<button class="btn" data-preset="${esc(k)}">${esc(k)}</button>`).join('')}</div>
+  ${VAR_GROUPS.map(gp=>`<div class="vgroup"><h4>${esc(gp.title)}</h4>${gp.intro?`<p class="hint">${esc(gp.intro)}</p>`:''}<div class="vars">${gp.keys.map(k=>{const vv=VARS.find(x=>x[0]===k);const [key,lab,type,opts,def,help]=vv;const val=v[key]??def;const ctl=type==='select'?`<select data-k="${key}">${opts.map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select>`:`<input type="${type}" data-k="${key}" value="${esc(val)}">`;return `<label class="f"><span>${lab}</span>${ctl}<small class="help">${esc(help)}</small></label>`}).join('')}</div></div>`).join('')}
+  <h4 style="margin:14px 0 0;font-size:13px">变量之间的约束</h4><p class="hint" style="margin:0 0 4px">改任何一项都会即时重算。红色的必须改掉才能确认输入。</p><div class="hints" id="varHints">${hintsHtml(v)}</div></div>
+  <div class="row"><button class="btn primary" id="btnConfirm">确认输入，进入环节 1</button><span class="hint">${S.sample?'接下来每个环节点一次"用 AI 生成"，看一眼结果，通过就到下一环节。':'提示：还没有可用的文本模型，点右上角"⚙ 设置"配置后再生成。'}</span></div>`;
+  const bind=(sel,fn)=>document.querySelectorAll(sel).forEach(el=>['input','change'].forEach(ev=>el.addEventListener(ev,()=>{fn(el);markSave()})));
+  bind('#pname',el=>{S.P.name=el.value;$('#ttl').textContent=el.value;renderRail()});bind('#idea',el=>I.idea=el.value);bind('#skel',el=>I.skeleton=el.value);
+  bind('[data-k]',el=>{v[el.dataset.k]=el.type==='number'?Number(el.value):el.value;const hb=$('#varHints');if(hb)hb.innerHTML=hintsHtml(v)});
+  document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{Object.assign(v,PRESETS[b.dataset.preset]);markSave();render();toast('已应用预设：'+b.dataset.preset)});
+  $('#btnTpl').onclick=()=>{I.skeleton=(I.skeleton.startsWith('示例')?'':I.skeleton.trim()+'\n\n')+SKELETON_TEMPLATE;markSave();render()};
+  $('#btnAsk').onclick=askSkeleton;
+  $('#btnConfirm').onclick=()=>{if(!I.idea.trim()||!I.skeleton.trim()){toast('idea 和故事骨架不能为空');return}if(I.skeleton.includes('____')){toast('骨架里还有没填的空');return}const bad=varHints(v).filter(h=>h.lvl==='error');if(bad.length){toast('变量有冲突：'+bad[0].msg);const hb=$('#varHints');if(hb&&hb.scrollIntoView)hb.scrollIntoView({block:'center'});return}setStatus(0,'done');S.cur=1;render()};
+}
+async function askSkeleton(){
+  if(!S.sample)return;const out=$('#askOut');const I=S.P.inputs;out.innerHTML='<div class="status">AI 正在读你的骨架…</div>';
+  try{const r=await S.sample.json(`你是资深游戏编剧，正在帮一个第一次做游戏的人检查 RPG 的故事骨架。不要替他写剧情，只提问和指出缺口。用中文。
+【世界观 idea】${I.idea}
+【故事骨架】${I.skeleton}
+请只输出 JSON：{"strengths":["骨架里已经做对的 1-2 点"],"questions":["3-5 个具体问题，每个指向一个缺口：主角动机、每章的转折、结局分叉对应的选择点、反派的目的、地点是否够具体"],"tip":"一句话建议，告诉他先补哪一个"}`,{modelTier:'quick',cache:false});
+    out.innerHTML=`<div class="guide ask"><div><div class="gl">已经不错的地方</div><ul>${(r.strengths||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div><div><div class="gl">建议先回答这些问题</div><ol>${(r.questions||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ol>${r.tip?`<p class="hint">${esc(r.tip)}</p>`:''}</div></div>`;
+  }catch(e){out.innerHTML=`<div class="status bad">没能完成：${esc(e.code||'')} ${esc(e.message||'')}</div>`;if(e.code==='not_granted')S.sample=null}
+}
+function sevLabel(s){return s==='error'?'错误':s==='warn'?'警告':'提示'}
+function issueRow(i){return `<div class="issue"><span class="sev ${i.severity}">${sevLabel(i.severity)}</span><span>${esc(i.msg)}${i.ai?' <span class="hint">（AI）</span>':''}</span><button class="btn ghost" data-go="${i.stage}" data-t="${esc(i.where?.table||'')}" data-id="${esc(i.where?.id??'')}">${i.where?.id!=null&&i.where.id!==''?'去这一行':i.where?.table?'去这张表':'去环节 '+i.stage}</button></div>`}
+function goTo(stage,table,id){
+  S.cur=Number(stage);S.play=null;S.hl=null;
+  if(table){if(S.cur===7){S.ui7.npc='all';S.ui7.view='tree'}else if(S.cur===4||S.cur===3){}else S.tab[S.cur]=table;S.hl={stage:S.cur,table,id:id==null||id===''?null:String(id)}}
+  render();const el=document.querySelector('.hl');if(el&&el.scrollIntoView)el.scrollIntoView({block:'center'});
+}
+function bindGo(){document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>goTo(b.dataset.go,b.dataset.t||null,b.dataset.id||null))}
+function renderAIStage(n){
+  const s=STAGES[n],st=S.stages[n]||{},status=stOf(n),running=S.running===n;
+  const prevOk=unlocked(n);
+  const iss=st.data&&!running?stageIssues(n):[];const errs=iss.filter(i=>i.severity==='error').length;
+  $('#work').innerHTML=`<h2>${n} · ${esc(s.name)}</h2><p class="lead">产出：${esc(s.out)}。${prevOk?'':'上一环节还没有通过审核，先完成前面的环节。'}</p>
+  ${guideBox(n)}
+  <div class="row" style="margin-bottom:8px">
+    <button class="btn primary" id="btnRun" ${!prevOk||running||!S.sample?'disabled':''}>${st.data?'重新生成（保留人改过的行）':'用 AI 生成'}</button>
+    ${running?'<button class="btn" id="btnStop">停止</button>':''}
+    ${st.data&&!running?`<button class="btn ${status==='done'?'':'primary'}" id="btnApprove" ${errs&&status!=='done'?'disabled':''} title="${errs?'先把下面的错误清零':''}">${status==='done'?'已通过 · 取消通过':errs?`还有 ${errs} 个错误，不能通过`:'审核通过，解锁下一环节'}</button>`:''}
+    <details style="margin:0"><summary>查看这一步的 prompt</summary><div class="stream" style="margin-top:6px;max-height:300px">${esc(promptFor(n))}</div></details>
+  </div>
+  <div class="meta" id="metaLine">${metaHtml(n)}</div>
+  ${running?`<div class="status">正在生成，第一段文字通常要等 5-60 秒…</div><div class="stream" id="stream">${esc(st.raw||'')}</div>`:''}
+  ${st.error&&!running?`<div class="status bad">上次生成失败：${esc(st.error)}${st.raw?'\n\n原始回复（可能不完整）：\n'+esc(st.raw.slice(0,1500)):''}</div>`:''}
+  ${iss.length?`<details ${errs?'open':''}><summary>这一环节的检查：${errs?`<span style="color:var(--bad)">${errs} 个错误</span>`:'没有错误'}，${iss.length-errs} 个警告</summary><div class="card" style="padding:0;margin-top:6px">${iss.map(issueRow).join('')}</div></details>`:(st.data&&!running?'<div class="status good">结构和引用检查都通过了。</div>':'')}
+  ${st.data&&!running?renderData(n,st.data):(!running&&!st.error?'<div class="status">还没有产出。点"用 AI 生成"，或在下方粘贴一份 JSON。</div>':'')}
+  ${!running?`<details><summary>${st.data?'编辑 JSON（整段改，改过的行同样会被记住）':'手动粘贴 JSON'}</summary><textarea class="json" id="jsonEdit">${esc(st.data?JSON.stringify(st.data,null,2):'')}</textarea><div class="row" style="margin-top:6px"><button class="btn" id="btnApply">应用修改</button><span class="hint" id="jsonMsg"></span></div></details>`:''}`;
+  const run=$('#btnRun');if(run)run.onclick=()=>runStage(n);
+  const stop=$('#btnStop');if(stop)stop.onclick=()=>S.ctl&&S.ctl.abort();
+  const ap=$('#btnApprove');if(ap)ap.onclick=()=>{if(status!=='done'&&errs){toast('还有错误，先修掉');return}setStatus(n,status==='done'?'ok':'done');if(status!=='done'&&n<8)S.cur=n+1;render()};
+  bindGo();
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{const t=b.dataset.copy;try{await navigator.clipboard.writeText(t);toast('已复制')}catch(e){toast('复制失败，请手动选择文字')}});
+  document.querySelectorAll('[data-gen]').forEach(b=>b.onclick=()=>genPortrait(b.dataset.gen));
+  const ga=$('#btnGenAll');if(ga)ga.onclick=genAllPortraits;
+  document.querySelectorAll('[data-upload]').forEach(inp=>inp.onchange=async()=>{const f=inp.files&&inp.files[0];if(!f)return;
+    try{const id=await storeBlob(f);const ch=(S.stages[3].data.characters||[]).find(c=>c.id===inp.dataset.upload);if(ch){ch.portrait_id=id;delete ch.portrait_url;await saveStage(3);toast('立绘已保存');render()}}catch(e){toast('上传失败：'+(e.code||e.message||''))}});
+  const apply=$('#btnApply');if(apply)apply.onclick=async()=>{try{const d=JSON.parse($('#jsonEdit').value);if(typeof d!=='object'||Array.isArray(d))throw new Error('顶层必须是对象');const changed=diffEdits(n,st.data,d);const meta=stMeta(n);S.stages[n]={data:d,raw:st.raw||'',updatedAt:Date.now(),meta};const e2=schemaCheck(n,d).filter(i=>i.severity==='error').length;setStatus(n,e2?'fix':'ok');await saveStage(n);toast(changed?`已应用，记住了 ${changed} 行改动`:'已应用');render()}catch(e){$('#jsonMsg').textContent='JSON 无效：'+e.message}};
+  document.querySelectorAll('.tab[data-key]').forEach(t=>t.onclick=()=>{S.tab[n]=t.dataset.key;S.hl=null;render()});
+  document.querySelectorAll('td.ed').forEach(td=>{td.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();td.blur()}if(e.key==='Escape'){td.textContent=String(rowsOf(n,st.data,td.dataset.t)?.find(r=>rowKey(r)===td.dataset.rid)?.[td.dataset.c]??'');td.blur()}};td.onblur=()=>commitCell(n,td)});
+  if(n===7){
+    document.querySelectorAll('[data-npc]').forEach(b=>b.onclick=()=>{S.ui7.npc=b.dataset.npc;S.hl=null;render()});
+    document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{S.ui7.view=b.dataset.view;render()});
+    document.querySelectorAll('span[contenteditable][data-d]').forEach(el=>{el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();el.blur()}};el.onblur=()=>commitDialogEdit(el)});
+    const rg=$('#btnRegenNpc');if(rg)rg.onclick=()=>{const T=tables();const id=S.ui7.npc;const qs=T.quests.filter(q=>q.giver_npc===id||q.deliver_npc===id);if(!qs.length){toast('这个 NPC 没有相关任务');return}runStage(7,{quests:qs,label:(byId(T.npcs,id)?.name||id)+' 的对白'})};
+  }
+  const hl=document.querySelector('.hl');if(hl&&hl.scrollIntoView)hl.scrollIntoView({block:'center'});
+}
+function cell(v){if(v==null)return '';if(typeof v==='object'){const s=JSON.stringify(v);return `<span class="mono" title="${esc(s)}">${esc(s.length>80?s.slice(0,80)+'…':s)}</span>`}return esc(v)}
+const LOCK=['id','node_id','chapter','quest_id','event_id'];
+function table(arr,o={}){
+  if(!arr.length)return '<div class="hint">空</div>';
+  const cols=[...new Set(arr.flatMap(x=>Object.keys(x||{})))];const rows=arr.slice(0,120);const ed=!!(o.editable&&o.n!=null&&o.t);const edited=(o.n!=null&&S.stages[o.n]?.meta?.edited?.[o.t])||{};
+  const body=rows.map(x=>{const rid=rowKey(x);const hl=S.hl&&S.hl.stage===o.n&&S.hl.table===o.t&&S.hl.id!=null&&S.hl.id===rid;
+    return `<tr data-rid="${esc(rid??'')}" class="${hl?'hl':''} ${rid!=null&&edited[rid]?'edited':''}">${cols.map(c=>{const val=x?.[c];const prim=val==null||typeof val!=='object';const can=ed&&prim&&rid!=null&&!LOCK.includes(c);return can?`<td class="ed" contenteditable="true" spellcheck="false" data-t="${esc(o.t)}" data-rid="${esc(rid)}" data-c="${esc(c)}">${esc(val??'')}</td>`:`<td>${cell(val)}</td>`}).join('')}</tr>`}).join('');
+  return `<div class="tbl"><table><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>${arr.length>120?`<div class="hint">共 ${arr.length} 行，只显示前 120 行</div>`:''}${ed?'<div class="hint" style="margin:-8px 0 12px">点一个格子可以直接改（回车保存，Esc 放弃）；改过的行左侧有黄色标记，重新生成时会保留。id 列和嵌套字段请在下方的 JSON 里改。</div>':''}`;
+}
+function renderData(n,data){
+  const keys=Object.keys(data);const arrays=keys.filter(k=>Array.isArray(data[k]));const others=keys.filter(k=>!Array.isArray(data[k]));
+  let html='';
+  if(n===3)return renderDesign(data);
+  if(n===7)return renderDialogs(data);
+  if(others.length)html+=`<div class="kv">${others.map(k=>`<b>${esc(k)}</b><div>${typeof data[k]==='object'?`<span class="mono">${esc(JSON.stringify(data[k]))}</span>`:esc(data[k])}</div>`).join('')}</div>`;
+  if(arrays.length){
+    if(n===4){const evs=(data.chapters||[]).flatMap(c=>(c.events||[]).map(e=>({chapter:c.id,...e})));html+=`<h3>事件（${evs.length}）</h3>`+table(evs,{n,t:'events',editable:true});if(data.endings)html+=`<h3>结局</h3>`+table(data.endings,{n,t:'endings',editable:true});return html}
+    const cur=arrays.includes(S.tab[n])?S.tab[n]:arrays[0];
+    html+=`<div class="tabs">${arrays.map(k=>`<button class="tab ${k===cur?'on':''}" data-key="${esc(k)}">${esc(k)} <span class="mono">${data[k].length}</span></button>`).join('')}</div>`;
+    const a=data[cur]||[];
+    if(n===5&&cur==='classes')html+=table(a.flatMap(c=>(c.trees||[]).flatMap(t=>(t.nodes||[]).map(nd=>({class:c.name,tree:t.name,...nd})))));
+    else html+=table(a,{n,t:cur,editable:true});
+  }
+  return html;
+}
+/* ---------- dialogue page: by NPC, tree / yarn / table ---------- */
+function dialogNpc(d){const q=byId(tables().quests,d.quest_id);if(!q)return null;return d.stage==='deliver'?(q.deliver_npc||q.giver_npc):q.giver_npc}
+function fxText(o){return (o.effects||[]).map(e=>e.type==='set_flag'?e.flag+'='+e.value:e.type).join(', ')}
+function renderDialogs(data){
+  const T=tables();const ds=data.dialogs||[];const U=S.ui7;
+  const npcIds=[...new Set(ds.map(dialogNpc).filter(Boolean))];const cnt=id=>ds.filter(d=>dialogNpc(d)===id).length;const orphan=ds.filter(d=>!dialogNpc(d)).length;
+  if(U.npc!=='all'&&!npcIds.includes(U.npc))U.npc='all';
+  const list=U.npc==='all'?ds:ds.filter(d=>dialogNpc(d)===U.npc);const nodes=list.reduce((a,d)=>a+(d.nodes||[]).length,0);const npcName=id=>byId(T.npcs,id)?.name||id;
+  let html=`<div class="npcs"><button class="btn ${U.npc==='all'?'primary':''}" data-npc="all">全部 NPC <span class="mono">${ds.length}</span></button>${npcIds.map(id=>`<button class="btn ${U.npc===id?'primary':''}" data-npc="${esc(id)}">${esc(npcName(id))} <span class="mono">${cnt(id)}</span></button>`).join('')}${orphan?`<span class="hint">${orphan} 段对白找不到对应任务</span>`:''}</div>`;
+  html+=`<div class="row" style="margin-bottom:10px"><div class="tabs" style="margin:0;border:0">${[['tree','树状预览'],['yarn','.yarn 源文本'],['table','节点表']].map(([k,l])=>`<button class="tab ${U.view===k?'on':''}" data-view="${k}">${l}</button>`).join('')}</div><span class="hint">${list.length} 段 · ${nodes} 个节点</span>${U.npc!=='all'&&S.sample?`<button class="btn" id="btnRegenNpc" ${S.running!=null?'disabled':''}>只重生成「${esc(npcName(U.npc))}」的对白</button>`:''}</div>`;
+  if(U.view==='yarn'){const y=yarnFor(list);html+=`<div class="row" style="margin-bottom:6px"><button class="btn ghost" data-copy="${esc(y)}">复制</button><span class="hint">Yarn Spinner 格式，Godot / Unity 可直接导入。由节点自动生成：改节点，不要改这里。每个节点一个 title，选项用 ->，flag 用 &lt;&lt;set&gt;&gt;，接取 / 交付用 &lt;&lt;start_quest&gt;&gt; / &lt;&lt;complete_quest&gt;&gt;。</span></div><div class="yarn">${esc(y)}</div>`;return html}
+  if(U.view==='table'){const ns=list.flatMap(d=>(d.nodes||[]).map(x=>({dialog:d.id,quest:d.quest_id,stage:d.stage,node:x.node_id,speaker:x.speaker,text:x.text,condition:x.condition,options:(x.options||[]).map(o=>`${o.text}→${o.next??'结束'}${(o.effects||[]).length?' ['+fxText(o)+']':''}`).join(' | ')})));html+=table(ns);return html}
+  const edited=S.stages[7]?.meta?.edited?.dialogs||{};
+  html+=list.map(d=>{const q=byId(T.quests,d.quest_id);const hl=S.hl&&S.hl.stage===7&&S.hl.id===d.id;
+    return `<div class="dlg ${hl?'hl':''}" data-rid="${esc(d.id)}"><h4>${esc(q?q.name:d.quest_id)} · ${d.stage==='accept'?'接取':d.stage==='deliver'?'交付':esc(d.stage)} <span class="hint">${esc(npcName(dialogNpc(d)||''))} · <span class="mono">${esc(d.id)}</span>${edited[d.id]?' · <span style="color:var(--warn)">人工改过，重生成时保留</span>':''}</span></h4>
+    ${(d.nodes||[]).map(nd=>`<div class="node"><span class="nid">${esc(nd.node_id)}</span> ${nd.condition?`<span class="cond">if ${esc(nd.condition)}</span> `:''}<span class="spk" contenteditable="true" spellcheck="false" data-d="${esc(d.id)}" data-n="${esc(nd.node_id)}" data-f="speaker">${esc(nd.speaker||'旁白')}</span>：<span contenteditable="true" spellcheck="false" data-d="${esc(d.id)}" data-n="${esc(nd.node_id)}" data-f="text">${esc(nd.text)}</span>
+      ${(nd.options||[]).map((o,i)=>`<div class="opt">→ <span contenteditable="true" spellcheck="false" data-d="${esc(d.id)}" data-n="${esc(nd.node_id)}" data-f="opt" data-i="${i}">${esc(o.text||'继续')}</span> <span class="nx">⇒ ${esc(o.next||'结束')}</span> ${(o.effects||[]).length?`<span class="fx">[${esc(fxText(o))}]</span>`:''}</div>`).join('')}</div>`).join('')}</div>`}).join('');
+  html+=`<p class="hint">台词、说话人和选项文字都可以点着改；跳转和效果在下方 JSON 里改。</p>`;
+  return html;
+}
+/* dialogue JSON is the source of truth; .yarn is rendered from it, deterministically */
+function yarnFor(ds){
+  const T=tables();const out=[];const V=f=>'$'+String(f).replace(/[^\w]/g,'_');
+  const val=v=>v===true?'true':v===false?'false':typeof v==='number'?String(v):JSON.stringify(String(v));
+  const lit=s=>(s==='true'||s==='false'||/^-?\d+(\.\d+)?$/.test(s))?s:JSON.stringify(s.replace(/^["']|["']$/g,''));
+  const cond=c=>{const parts=String(c).split('&&').map(x=>x.trim()).filter(Boolean).map(x=>{const m=x.match(/^(!?)\s*([\w\.]+)\s*(?:(==|!=)\s*(\S+))?$/);if(!m)return null;if(!m[3])return `${V(m[2])} == ${m[1]?'false':'true'}`;return `${V(m[2])} ${m[3]} ${lit(m[4])}`});return parts.every(Boolean)?parts.join(' and '):null};
+  ds.forEach(d=>{const nodes=d.nodes||[];const title=id=>`${d.id}__${id}`;
+    out.push(`title: ${d.id}`,`tags: ${d.stage} quest_${d.quest_id}`,'---');
+    const conds=nodes.filter(nd=>nd.condition&&cond(nd.condition));const def=nodes.find(nd=>!nd.condition)||nodes[0];
+    if(conds.length){conds.forEach((nd,i)=>{out.push(`<<${i?'elseif':'if'} ${cond(nd.condition)}>>`,`    <<jump ${title(nd.node_id)}>>`)});if(def)out.push('<<else>>',`    <<jump ${title(def.node_id)}>>`);out.push('<<endif>>')}
+    else if(def)out.push(`<<jump ${title(def.node_id)}>>`);
+    out.push('===','');
+    nodes.forEach(nd=>{out.push(`title: ${title(nd.node_id)}`,'---',`${nd.speaker||'旁白'}: ${String(nd.text||'').replace(/\s*\n\s*/g,' ')}`);
+      const opts=nd.options||[];const terminal=!opts.length||opts.every(o=>!o.next);
+      if(opts.length===1&&(!opts[0].text||opts[0].text==='继续')&&!(opts[0].effects||[]).length){if(opts[0].next)out.push(`<<jump ${title(opts[0].next)}>>`)}
+      else opts.forEach(o=>{out.push(`-> ${o.text||'继续'}`);(o.effects||[]).forEach(e=>{if(e.type==='set_flag')out.push(`    <<set ${V(e.flag)} to ${val(e.value)}>>`);else if(e.type==='accept_quest')out.push(`    <<start_quest ${d.quest_id}>>`);else out.push(`    <<${String(e.type||'noop').replace(/[^\w]/g,'_')}${e.target?' '+e.target:''}>>`)});if(o.next)out.push(`    <<jump ${title(o.next)}>>`)});
+      if(d.stage==='deliver'&&terminal)out.push(`<<complete_quest ${d.quest_id}>>`);
+      out.push('===','')})});
+  return out.join('\n');
+}
+const isHex=s=>/^#[0-9a-fA-F]{3,8}$/.test(String(s||''));
+const sw=c=>isHex(c)?`<i class="sw" style="background:${c}" title="${esc(c)}"></i>`:'';
+function renderDesign(d){
+  const g=d.style_guide||{};const chars=d.characters||[];
+  let html=`<div class="card"><h3 style="margin-top:0">风格指南</h3><div class="kv"><b>画风</b><div>${esc(g.art_style||'')}</div><b>头身比</b><div>${esc(g.proportion||'')}</div><b>线条与上色</b><div>${esc(g.line_and_shading||'')}</div><b>主色板</b><div class="swatches">${(g.palette||[]).map(sw).join('')}</div>${(g.faction_motifs||[]).length?`<b>势力纹样</b><div>${g.faction_motifs.map(m=>esc(m.faction)+'：'+esc(m.motif)).join('；')}</div>`:''}${g.notes?`<b>备注</b><div>${esc(g.notes)}</div>`:''}</div></div>`;
+  html+=`<div class="row" style="margin:14px 0 6px"><h3 style="margin:0">角色形象卡（${chars.length}）</h3>${imgReady()&&chars.length?`<button class="btn" id="btnGenAll" ${S.genImg.size?'disabled':''}>${S.genImg.size?`生成中 ${S.genImg.size} 张…`:`为还没有立绘的角色生成（${chars.filter(c=>!portraitUrl(c)).length} 张）`}</button>`:''}</div><div class="cards">`+chars.map(c=>{const url=portraitUrl(c);const busy=S.genImg.has(c.id);return `<div class="ccard" data-cid="${esc(c.id)}">
+    <div class="pt">${url?`<img src="${esc(url)}" alt="${esc(c.name)} 立绘">`:`<div class="ph">${esc((c.name||'?').slice(0,1))}</div>`}<div class="swatches">${sw(c.colors?.main)}${sw(c.colors?.secondary)}${sw(c.colors?.accent)}</div>${imgReady()?`<button class="btn ghost up" data-gen="${esc(c.id)}" ${busy?'disabled':''}>${busy?'生成中…':url?'重新生成':'生成立绘'}</button>`:''}<label class="btn ghost up">${url?'换一张':'上传立绘'}<input type="file" accept="image/*" data-upload="${esc(c.id)}" hidden></label>${c.portrait_url&&!c.portrait_id?'<span class="hint" style="font-size:10.5px;text-align:center">临时链接，会过期</span>':''}</div>
+    <div class="cbody"><div class="cn">${esc(c.name)} <span class="hint">${esc(c.role||'')} · <span class="mono">${esc(c.id)}</span></span></div>
+    <div class="kv small"><b>轮廓</b><div>${esc(c.silhouette||'')}</div><b>面部</b><div>${esc(c.face||'')}</div><b>服装</b><div>${esc(c.outfit||'')}</div><b>标志物</b><div>${esc(c.signature_item||'')}</div><b>性格外化</b><div>${esc(c.personality_cues||'')}</div><b>表情</b><div>${(c.expressions||[]).map(esc).join('、')}</div><b>行走图</b><div>${esc(c.walk_sprite?.source||'')}${c.walk_sprite?.base?'：'+esc(c.walk_sprite.base):''}</div></div>
+    <details><summary>生图 prompt</summary><div class="prompt">${esc(c.portrait_prompt_en||'')}</div><div class="row" style="margin:4px 0 8px"><button class="btn ghost" data-copy="${esc(c.portrait_prompt_en||'')}">复制英文</button><button class="btn ghost" data-copy="${esc(c.portrait_prompt_zh||'')}">复制中文</button></div><div class="hint">中文：${esc(c.portrait_prompt_zh||'')}</div>${c.negative_prompt?`<div class="hint">避免：${esc(c.negative_prompt)}</div>`:''}</details></div></div>`}).join('')+`</div>`;
+  html+=imgReady()?`<p class="hint">点"生成立绘"会把卡片上的英文 prompt 发给你在设置里填的图片模型，生成后自动存到卡片；不满意就改 prompt 再生成。也可以用 Midjourney、即梦等手动生成后上传。试玩界面和导出包都会带上立绘。</p>`:`<p class="hint">想在这里直接出图：点右上角"⚙ 设置"填一个图片模型的接口和 key，卡片上就会出现"生成立绘"。或者拿上面的 prompt 去 Midjourney、Stable Diffusion、即梦里生成，再上传到对应卡片。试玩界面和导出包都会带上立绘。</p>`;
+  return html;
+}
+function collectIssues(){
+  const st=S.stages[9]||{};
+  const schema=STAGES.filter(s=>s.ai&&S.stages[s.n]?.data).flatMap(s=>schemaCheck(s.n,S.stages[s.n].data));
+  const refs=validate().map(i=>({...i,kind:'引用'}));const sim=simulate();
+  const ai=(st.ai||[]).map(x=>({stage:Number(x.stage)||9,severity:['error','warn','info'].includes(x.severity)?x.severity:'warn',msg:`${x.msg||''}${x.fix?'　→ '+x.fix:''}`,kind:'一致性',ai:true}));
+  const all=[...schema,...refs,...sim.issues.map(i=>({...i,kind:'数值'})),...ai];
+  return {all,errs:all.filter(i=>i.severity==='error').length,sim,aiAt:st.aiAt};
+}
+function renderCheck(){
+  const {all,errs,sim,aiAt}=collectIssues();
+  const byStage={};all.forEach(i=>{(byStage[i.stage]=byStage[i.stage]||[]).push(i)});
+  const groups=Object.keys(byStage).sort((a,b)=>a-b).map(sn=>{const L=byStage[sn];const kinds={};L.forEach(i=>{(kinds[i.kind]=kinds[i.kind]||[]).push(i)});const ne=L.filter(i=>i.severity==='error').length;
+    return `<div class="grp"><h4>环节 ${sn} · ${esc(STAGES[sn]?.name||'')} <span class="pill">${L.length} 条</span>${ne?`<span class="sev error">${ne} 个错误</span>`:''}</h4>${Object.entries(kinds).map(([k,li])=>`<div class="card" style="padding:0;margin-bottom:8px"><div class="hint" style="padding:6px 10px;border-bottom:1px solid var(--line)">${esc(k)}检查 · ${li.length} 条</div>${li.map(issueRow).join('')}</div>`).join('')}</div>`}).join('');
+  const kindCount={};all.forEach(i=>{kindCount[i.kind]=(kindCount[i.kind]||0)+1});
+  $('#work').innerHTML=`<h2>9 · 校验与模拟</h2><p class="lead">四道检查：结构（每张表该有的字段和数量）、引用（id 和 flag 是否都存在）、数值（按成长曲线自动打一遍所有任务）、AI 一致性（人物、地点、台词风格）。错误为 0 才能标记通过，也才能导出内容包。</p>
+  ${guideBox(9)}
+  <div class="row" style="margin-bottom:12px"><button class="btn" id="btnAI" ${!S.sample||S.running!=null?'disabled':''}>${S.running===9?'检查中…':'运行 AI 一致性检查'}</button>${S.running===9?'<button class="btn" id="btnStop">停止</button>':''}<button class="btn ${errs?'':'primary'}" id="btnPass" ${errs?'disabled':''}>${stOf(9)==='done'?'已通过':'标记通过'}</button><span class="hint">${all.length} 条问题，其中 <b style="color:${errs?'var(--bad)':'var(--good)'}">${errs} 个错误</b>${aiAt?'；AI 检查于 '+new Date(aiAt).toLocaleTimeString():'；还没运行 AI 一致性检查'}</span></div>
+  <div class="row" style="margin-bottom:12px">${Object.entries(kindCount).map(([k,c])=>`<span class="pill">${esc(k)} ${c}</span>`).join('')}</div>
+  ${S.running===9?`<div class="stream" id="stream"></div>`:''}
+  ${all.length?groups:'<div class="card"><div class="empty">没有发现问题</div></div>'}
+  <h3>数值模拟（无随机，只用普攻）</h3>${table(sim.rows)}`;
+  bindGo();
+  const ai1=$('#btnAI');if(ai1)ai1.onclick=()=>runStage(9);
+  const stop=$('#btnStop');if(stop)stop.onclick=()=>S.ctl&&S.ctl.abort();
+  $('#btnPass').onclick=()=>{if(errs){toast('还有错误');return}setStatus(9,'done');S.cur=10;render()};
+}
+function bundle(){return {meta:{name:S.P.name,exported:new Date().toISOString(),tool:'RPG 工坊 v4',checked:stOf(9)==='done'},inputs:S.P.inputs,curve:curve(),stages:Object.fromEntries(STAGES.filter(s=>S.stages[s.n]?.data).map(s=>[s.n,S.stages[s.n].data]))}}
+/* ---------- content pack (zip) ---------- */
+function csv(arr){if(!arr||!arr.length)return '';const cols=[...new Set(arr.flatMap(o=>Object.keys(o||{})))];const q=v=>{let s=v==null?'':(typeof v==='object'?JSON.stringify(v):String(v));return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};return [cols.join(','),...arr.map(o=>cols.map(c=>q(o?.[c])).join(','))].join('\r\n')}
+function md(s){return String(s??'').replace(/\|/g,'\\|').replace(/\n/g,' ')}
+function mdTable(arr,cols){if(!arr.length)return '（空）\n';return `| ${cols.map(c=>c[0]).join(' | ')} |\n| ${cols.map(()=>'---').join(' | ')} |\n`+arr.map(r=>`| ${cols.map(c=>md(typeof c[1]==='function'?c[1](r):r[c[1]])).join(' | ')} |`).join('\n')+'\n'}
+function designMd(d){const g=d.style_guide||{};let s=`# 人物形象卡\n\n## 风格指南\n\n- 画风：${md(g.art_style)}\n- 头身比：${md(g.proportion)}\n- 线条与上色：${md(g.line_and_shading)}\n- 主色板：${(g.palette||[]).join(' ')}\n${(g.faction_motifs||[]).map(m=>`- 势力纹样 ${md(m.faction)}：${md(m.motif)}`).join('\n')}\n${g.notes?'- 备注：'+md(g.notes)+'\n':''}\n`;
+  (d.characters||[]).forEach(c=>{s+=`## ${md(c.name)}（${md(c.id)} · ${md(c.role)}）\n\n- 轮廓：${md(c.silhouette)}\n- 面部：${md(c.face)}\n- 服装：${md(c.outfit)}\n- 配色：${[c.colors?.main,c.colors?.secondary,c.colors?.accent].filter(Boolean).join(' / ')}\n- 标志物：${md(c.signature_item)}\n- 性格外化：${md(c.personality_cues)}\n- 表情：${(c.expressions||[]).join('、')}\n- 行走图：${md(c.walk_sprite?.source)}${c.walk_sprite?.base?'，'+md(c.walk_sprite.base):''}\n- 立绘文件：${c.portrait_id?'portraits/'+c.id:'（未上传）'}\n\n生图 prompt（英文）：\n\n\`\`\`\n${c.portrait_prompt_en||''}\n\`\`\`\n\n生图 prompt（中文）：${md(c.portrait_prompt_zh)}\n\n避免：${md(c.negative_prompt)}\n\n`});
+  return s}
+function artMd(){const T=tables();const d8=S.stages[8]?.data||{};const v=S.P.inputs.vars;const g=T.design.style_guide||{};
+  let s=`# 美术需求单\n\n项目：${S.P.name}　美术风格：${v.art_style}　内容限制：${v.content_limit}\n\n`;
+  if(g.art_style)s+=`风格指南：${md(g.art_style)}；${md(g.proportion)}；${md(g.line_and_shading)}；主色板 ${(g.palette||[]).join(' ')}\n\n`;
+  s+=`## 一、角色立绘（${(T.design.characters||[]).length} 张）\n\n每个角色一张立绘 + ${(T.design.characters?.[0]?.expressions||[]).length||4} 个表情差分，规格见 design/characters.md。\n\n`+mdTable(T.design.characters||[],[['id','id'],['角色','name'],['身份','role'],['已上传立绘',r=>r.portrait_id?'是':'否']]);
+  s+=`\n## 二、场景与 boss 单图（${(d8.art||[]).length} 张）\n\n`+mdTable(d8.art||[],[['对象','target'],['类型','type'],['描述','desc'],['风格','style']]);
+  s+=`\n## 三、地图（${T.maps.length} 张）\n\n`+mdTable(T.maps,[['id','id'],['名称','name'],['类型','type'],['尺寸','size'],['图块集','tileset'],['布局','layout']]);
+  s+=`\n## 四、物品图标（${T.items.length} 个）\n\n`+mdTable(T.items,[['id','id'],['名称','name'],['种类','kind'],['档位','tier'],['图标描述','icon_desc']]);
+  s+=`\n## 五、敌人（${T.enemies.length} 种）\n\n`+mdTable(T.enemies,[['id','id'],['名称','name'],['类型','type'],['boss',r=>r.boss?'是':''],['外观','appearance']]);
+  s+=`\n## 六、素材包建议\n\n`+((d8.asset_packs||[]).map(a=>`- ${md(a.use)}：${md(a.suggest)}`).join('\n')||'（无）')+'\n';
+  return s}
+function issuesMd(all){if(!all.length)return '# 问题清单\n\n没有发现问题。\n';const by={};all.forEach(i=>{(by[i.stage]=by[i.stage]||[]).push(i)});return '# 问题清单\n\n'+Object.keys(by).sort((a,b)=>a-b).map(sn=>`## 环节 ${sn} · ${STAGES[sn]?.name||''}\n\n`+by[sn].map(i=>`- [${sevLabel(i.severity)}·${i.kind}] ${md(i.msg)}${i.where?`（${i.where.table}${i.where.id?' / '+i.where.id:''}）`:''}`).join('\n')+'\n').join('\n')}
+function readmeMd(stats){const v=S.P.inputs.vars;const T=tables();return `# ${S.P.name} · 内容包\n\n由 RPG 工坊导出于 ${new Date().toLocaleString()}。目标引擎：${v.engine}。校验状态：${stOf(9)==='done'?'环节 9 已通过':'未通过校验'}。\n\n## 里面有什么\n\n- tables/：每张数据表的 JSON 和 CSV（地点、势力、NPC、章节事件、结局、职业、技能、物品、敌人、敌群、状态、商店、任务、任务分步、flag、地图、地图事件），curve.json 是成长曲线\n- dialogue/：对白，按 NPC 一个 .yarn 文件（Yarn Spinner 格式），all.yarn 是合集，dialogs.json 是源数据\n- design/：人物形象卡（characters.md / characters.json）和已上传的立绘 portraits/\n- art/art_requests.md：美术需求单（立绘、场景单图、地图、图标、敌人、素材包建议）\n- issues.md / issues.json：导出时的问题清单\n- bundle.json：全部环节产出的原始 JSON；inputs.json：idea、骨架和 24 个变量\n\n## 规模\n\n任务 ${T.quests.length}（主线 ${T.quests.filter(q=>q.kind==='main').length}）· NPC ${T.npcs.length} · 对白 ${T.dialogs.length} 段 ${T.dialogs.reduce((a,d)=>a+(d.nodes||[]).length,0)} 节点 · 技能 ${T.skills.length} · 物品 ${T.items.length} · 敌人 ${T.enemies.length} · 地图 ${T.maps.length}\n\n## 生成记录\n\n${stats}\n\n## 怎么装进引擎\n\n- Godot + Yarn Spinner：tables/*.json 读成资源，dialogue/*.yarn 直接导入；自定义命令 start_quest / complete_quest / set 按任务表和 flag 表实现。\n- RPG Maker MZ：classes/skills/items/enemies/troops/states 转成对应的 data/*.json；quests 和 flags 用开关和变量；对白写成地图事件的"显示文字 / 显示选项 / 条件分支"。\n- 数值：每级具体数字用 curve.json 的公式算（player_hp = hp_base + hp_per_level × (L-1)，以此类推），表里只存基础值和倍率。\n`}
+function genStats(){return STAGES.filter(s=>s.ai).map(s=>{const m=S.stages[s.n]?.meta;if(!m||!m.runs)return `- 环节 ${s.n} ${s.name}：未生成`;return `- 环节 ${s.n} ${s.name}：生成 ${m.runs} 次，累计 ${Math.round((m.totalMs||0)/1000)} 秒，人工改过 ${editedCount(s.n)} 行`}).join('\n')}
+async function buildZip(){
+  if(!window.JSZip)throw new Error('打包库没有加载，请刷新页面');
+  const z=new JSZip();const T=tables();
+  const tbl={locations:T.world.locations||[],factions:T.world.factions||[],rules:T.world.rules||[],hero:T.hero&&Object.keys(T.hero).length?[T.hero]:[],npcs:T.npcs,chapters:T.chapters.map(c=>({id:c.id,title:c.title,summary:c.summary,events:(c.events||[]).length})),events_story:T.chapters.flatMap(c=>(c.events||[]).map(e=>({chapter_id:c.id,...e}))),endings:S.stages[4]?.data?.endings||[],classes:T.classes,skills:T.skills,items:T.items,enemies:T.enemies,troops:T.troops,states:T.states,shops:T.shops,quests:T.quests,quest_steps:T.quests.flatMap(q=>stepsOf(q).map((s,i)=>({quest_id:q.id,step:i+1,...s}))),flags:T.flags,maps:T.maps,map_events:T.events,art_requests:S.stages[8]?.data?.art||[]};
+  for(const [k,a] of Object.entries(tbl)){z.file(`tables/${k}.json`,JSON.stringify(a,null,2));z.file(`tables/${k}.csv`,'﻿'+csv(a))}
+  z.file('tables/curve.json',JSON.stringify(curve(),null,2));
+  const byNpc={};T.dialogs.forEach(d=>{const id=dialogNpc(d)||'misc';(byNpc[id]=byNpc[id]||[]).push(d)});
+  for(const [id,ds] of Object.entries(byNpc))z.file(`dialogue/${id}.yarn`,yarnFor(ds));
+  z.file('dialogue/all.yarn',yarnFor(T.dialogs));z.file('dialogue/dialogs.json',JSON.stringify(T.dialogs,null,2));
+  const d3=S.stages[3]?.data;let portraits=0;
+  if(d3){z.file('design/characters.json',JSON.stringify(d3,null,2));z.file('design/characters.md',designMd(d3));
+    for(const c of (d3.characters||[])){const u=portraitUrl(c);if(!u)continue;try{const r=await fetch(u);if(r.ok){const b=await r.blob();const ext=((b.type.split('/')[1]||'png').replace('jpeg','jpg').replace('svg+xml','svg'));z.file(`design/portraits/${c.id}.${ext}`,b);portraits++}}catch(e){console.warn(e)}}}
+  z.file('art/art_requests.md',artMd());
+  const {all}=collectIssues();z.file('issues.json',JSON.stringify(all,null,2));z.file('issues.md',issuesMd(all));
+  z.file('bundle.json',JSON.stringify(bundle(),null,2));z.file('inputs.json',JSON.stringify(S.P.inputs,null,2));
+  z.file('README.md',readmeMd(genStats()+(portraits?`\n- 立绘：已打包 ${portraits} 张`:'')));
+  return z.generateAsync({type:'blob',compression:'DEFLATE'});
+}
+async function exportZip(){
+  if(!S.P)return;
+  if(stOf(9)!=='done'){toast('导出内容包前要先在环节 9 标记通过');S.cur=9;S.play=null;render();return}
+  if(!S.downloads){toast('这个视图不能保存文件，请在 claude.ai 里打开');return}
+  const b=$('#btnExport');if(b)b.disabled=true;toast('正在打包…');
+  try{const blob=await buildZip();await S.downloads.save({filename:(S.P.name||'rpg').replace(/[\\/:*?"<>|]/g,'_')+'_内容包.zip',data:blob});toast('内容包已保存')}
+  catch(e){if(e&&e.code==='declined')toast('已取消');else toast('打包失败：'+(e.code||e.message||''))}
+  if(b)b.disabled=false;
+}
+function renderBuild(){
+  const T=tables();const have=STAGES.filter(s=>s.ai&&S.stages[s.n]?.data).length;
+  const v=S.P.inputs.vars;const passed=stOf(9)==='done';const {errs}=collectIssues();
+  const runs=STAGES.filter(s=>s.ai).reduce((a,s)=>a+(S.stages[s.n]?.meta?.runs||0),0),ms=STAGES.filter(s=>s.ai).reduce((a,s)=>a+(S.stages[s.n]?.meta?.totalMs||0),0),ed=STAGES.filter(s=>s.ai).reduce((a,s)=>a+editedCount(s.n),0);
+  $('#work').innerHTML=`<h2>10 · 构建与试玩</h2><p class="lead">当前已有 ${have}/8 个 AI 环节的产出。内容包是一个 zip：每张表的 JSON 和 CSV、按 NPC 分的 .yarn 对白、形象卡和立绘、美术需求单、问题清单，交给程序装进 Godot 或 RPG Maker。"文本试玩"直接用这些表在页面里跑一遍：NPC 话题菜单、分步目标、对白和选项、回合制战斗、奖励升级、结局。</p>
+  ${guideBox(10)}
+  <div class="card"><div class="kv"><b>目标引擎</b><div>${esc(v.engine)}</div><b>任务</b><div>${T.quests.length} 个（主线 ${T.quests.filter(q=>q.kind==='main').length}），分步 ${T.quests.reduce((a,q)=>a+stepsOf(q).length,0)} 步</div><b>NPC / 敌人 / 物品</b><div>${T.npcs.length} / ${T.enemies.length} / ${T.items.length}</div><b>对白</b><div>${T.dialogs.length} 段，${T.dialogs.reduce((a,d)=>a+(d.nodes||[]).length,0)} 个节点</div><b>地图 / 事件</b><div>${T.maps.length} / ${T.events.length}</div><b>结局</b><div>${(S.stages[4]?.data?.endings||[]).length} 个</div><b>校验</b><div>${passed?'<span style="color:var(--good)">环节 9 已通过</span>':`<span style="color:var(--bad)">未通过（当前 ${errs} 个错误）</span>`}</div><b>生成记录</b><div>8 个环节共生成 ${runs} 次，累计 ${Math.round(ms/1000)} 秒，人工改过 ${ed} 行</div></div>
+  <div class="row"><button class="btn primary" id="btnPlay2" ${T.quests.length?'':'disabled'}>开始文本试玩</button><button class="btn ${passed?'primary':''}" id="btnZip" title="${passed?'':'需要环节 9 标记通过'}">导出内容包 zip${passed?'':'（需先通过校验）'}</button><button class="btn" id="btnExport2">导出原始 JSON</button><button class="btn" id="btnCopy">复制 JSON</button></div>
+  <p class="hint" style="margin:8px 0 0">内容包里：tables/（22 张表 × JSON + CSV，curve.json）、dialogue/（每个 NPC 一个 .yarn + all.yarn + dialogs.json）、design/（characters.md、characters.json、portraits/）、art/art_requests.md、issues.md、bundle.json、inputs.json、README.md。原始 JSON 不受校验门槛限制，方便调试。</p></div>
+  <h3>装进引擎</h3><div class="tbl"><table><thead><tr><th>内容包里的文件</th><th>Godot + Yarn Spinner</th><th>RPG Maker MZ</th></tr></thead><tbody>
+  <tr><td>tables/classes、skills</td><td>读成 Resource；技能树节点按 prereq 解锁</td><td>Classes.json, Skills.json（节点转成按等级学习）</td></tr>
+  <tr><td>tables/items</td><td>Resource；atk/def = tier × curve 参数</td><td>Weapons.json, Armors.json, Items.json</td></tr>
+  <tr><td>tables/enemies、troops、states</td><td>按 curve 公式展开每级数值</td><td>Enemies.json, Troops.json, States.json</td></tr>
+  <tr><td>tables/quests、quest_steps、flags</td><td>任务管理器读表；flag 即 Yarn 变量</td><td>Switches + 变量 + 公共事件</td></tr>
+  <tr><td>dialogue/*.yarn</td><td>直接导入，实现 start_quest / complete_quest 两个命令</td><td>转成"显示文字 / 显示选项 / 条件分支"</td></tr>
+  <tr><td>tables/maps、map_events</td><td>TileMap + 事件节点</td><td>MapXXX.json + MapInfos.json</td></tr>
+  <tr><td>design/portraits、art/art_requests.md</td><td>立绘按 character id 命名</td><td>img/faces、img/pictures</td></tr></tbody></table></div>
+  <details><summary>查看原始 JSON</summary><textarea class="json" readonly id="jsonOut">${esc(JSON.stringify(bundle(),null,2))}</textarea></details>`;
+  $('#btnPlay2').onclick=startPlay;$('#btnExport2').onclick=exportJson;$('#btnZip').onclick=exportZip;
+  $('#btnCopy').onclick=async()=>{const t=JSON.stringify(bundle(),null,2);try{await navigator.clipboard.writeText(t);toast('已复制')}catch(e){const ta=$('#jsonOut');ta.closest('details').open=true;ta.select();toast('请手动复制')}};
+}
+async function exportJson(){
+  if(!S.P)return;const data=JSON.stringify(bundle(),null,2);
+  if(!S.downloads){S.cur=10;render();const d=$('#jsonOut');if(d){d.closest('details').open=true}toast('这个视图不能保存文件，请复制 JSON');return}
+  try{await S.downloads.save({filename:(S.P.name||'rpg')+'.json',data});toast('已保存')}catch(e){if(e.code!=='declined')toast('保存失败：'+e.code)}
+}
+
+/* ---------- text play ---------- */
+function startPlay(){
+  const T=tables();if(!T.quests.length){toast('还没有任务表');return}
+  const ps=playerStats(1,0,0);
+  const order=[...T.quests].sort((a,b)=>(Number(a.level)||1)-(Number(b.level)||1)||(a.kind==='main'?-1:1));
+  S.play={T,log:[],L:1,xp:0,hp:ps.hp,fp:ps.fp,gold:0,inv:{},wTier:0,aTier:0,flags:{},done:new Set(),q:null,step:0,battle:null,choices:[],order,loc:order[0]?.location_id||T.world.locations?.[0]?.id||null,ended:false};
+  say('sys',`《${T.world.title||S.P.name}》文本试玩。你是 ${T.hero.name||'主角'}，${T.hero.identity||''}`);
+  hub();
+}
+function say(k,t,who){S.play.log.push({k,t,who});render();const l=$('#log');if(l)l.scrollTop=l.scrollHeight}
+function choose(list){S.play.choices=list;render()}
+function flagOk(cond,flags){if(!cond||!String(cond).trim())return true;return String(cond).split('&&').every(c=>{c=c.trim();if(!c)return true;const m=c.match(/^(!?)\s*([\w\.]+)\s*(?:(==|!=)\s*(\S+))?$/);if(!m)return true;const val=flags[m[2]];if(!m[3])return m[1]?!val:!!val;const raw=m[4].replace(/^["']|["']$/g,'');const want=raw==='true'?true:raw==='false'?false:(/^-?\d+(\.\d+)?$/.test(raw)?Number(raw):raw);return m[3]==='=='?val==want:val!=want})}
+function locName(id){return byId(S.play.T.world.locations,id)?.name||id||'未知地点'}
+function available(){const P=S.play;return P.order.filter(q=>!P.done.has(q.id)&&(q.prereq_flags||[]).every(f=>P.flags[f]))}
+function hub(){
+  const P=S.play;P.q=null;P.step=0;const av=available();
+  if(!av.length){ending();return}
+  const here=av.filter(q=>!q.location_id||q.location_id===P.loc),away=av.filter(q=>q.location_id&&q.location_id!==P.loc);
+  say('sys',`你在${locName(P.loc)}。${here.length?'这里有 '+here.length+' 个人想和你谈。':''}${away.length?'另有 '+away.length+' 个任务在别处。':''}`);
+  const item=q=>{const g=byId(P.T.npcs,q.giver_npc);return {t:`${q.location_id&&q.location_id!==P.loc?'前往'+locName(q.location_id)+'，':''}和${g?g.name:'?'}谈「${q.name}」（${q.kind==='main'?'主线':'支线'}）`,f:()=>startQuest(q)}};
+  const list=[...here.map(item),...away.map(item)];
+  list.push({t:'查看任务日志',f:()=>{say('sys','任务日志 — 已完成：'+(P.done.size?[...P.done].map(id=>byId(P.T.quests,id)?.name||id).join('、'):'无')+'；可接：'+av.map(q=>q.name).join('、')+'；flag：'+(Object.entries(P.flags).map(([k,v])=>k+'='+v).join('、')||'无'));choose(list)}});
+  choose(list);
+}
+function startQuest(q){
+  const P=S.play;P.q=q;P.step=0;
+  if(q.location_id&&q.location_id!==P.loc){P.loc=q.location_id;say('sys',`你来到${locName(P.loc)}。`)}
+  const giver=byId(P.T.npcs,q.giver_npc);say('sys',`—— ${q.kind==='main'?'主线':'支线'}「${q.name}」· ${giver?giver.name:'?'}${q.desc?'\n'+q.desc:''}`);
+  runDialog(q,'accept',()=>doStep(q));
+}
+function runDialog(q,stage,after){
+  const P=S.play;const d=P.T.dialogs.find(d=>d.quest_id===q.id&&d.stage===stage);
+  if(!d||!(d.nodes||[]).length){say('sys',stage==='accept'?'（没有接取对白，直接接受任务）':'（没有交付对白）');after();return}
+  const go=id=>{let nd=id?d.nodes.find(x=>x.node_id===id):(d.nodes.find(x=>x.condition&&flagOk(x.condition,P.flags))||d.nodes.find(x=>!x.condition)||d.nodes[0]);
+    if(!nd){after();return}
+    say('sp',nd.text,nd.speaker||'旁白');
+    const opts=(nd.options||[]).filter(o=>flagOk(o.condition,P.flags));
+    if(!opts.length){after();return}
+    choose(opts.map(o=>({t:o.text||'继续',f:()=>{(o.effects||[]).forEach(e=>{if(e.type==='set_flag'){P.flags[e.flag]=e.value;say('sys',`[flag] ${e.flag} = ${e.value}`)}});if(o.next)go(o.next);else after()}})));
+  };go(null);
+}
+function doStep(q){
+  const P=S.play;const steps=stepsOf(q);const o=steps[P.step];
+  if(!o){deliver(q);return}
+  const tag=steps.length>1?`（第 ${P.step+1}/${steps.length} 步）`:'';
+  const next=()=>{P.step++;doStep(q)};
+  if(o.type==='kill'){const tid=o.target_id||q.troop_id;const tr=byId(P.T.troops,tid);const members=(tr?.members||[]).map(id=>byId(P.T.enemies,id)).filter(Boolean);
+    if(!members.length){say('sys',`${tag}（敌群为空，跳过战斗）`);next();return}
+    say('sys',`${tag}${o.desc||''} ${tr?.name||'敌人'}挡住去路！`);
+    startBattle(members,next,()=>{say('sys','你倒下了。'+(S.P.inputs.vars.fail_mode)+'，HP 恢复一半，重新挑战。');P.hp=Math.max(1,Math.round(playerStats(P.L,P.wTier,P.aTier).hp/2));choose([{t:'再试一次',f:()=>doStep(q)},{t:'放弃这个任务',f:()=>{P.done.add(q.id);hub()}}])});return}
+  if(o.type==='talk'){const x=byId(P.T.npcs,o.target_id);say('sys',`${tag}你找到${x?x.name:'要找的人'}。${o.desc||''}`);choose([{t:x?`和${x.name}说话`:'继续',f:next}]);return}
+  if(o.type==='reach'){if(o.target_id&&byId(P.T.world.locations,o.target_id))P.loc=o.target_id;say('sys',`${tag}你前往${locName(o.target_id)}。${o.desc||''}`);choose([{t:'继续',f:next}]);return}
+  if(o.type==='collect'){const it=byId(P.T.items,o.target_id);const c=Number(o.count)||1;if(it)P.inv[it.id]=(P.inv[it.id]||0)+c;say('sys',`${tag}${o.desc||''}${it?' 获得 '+it.name+'×'+c:''}`);choose([{t:'继续',f:next}]);return}
+  say('sys',`${tag}你${o.desc||('完成了：'+(o.type||'目标'))}。`);choose([{t:'继续',f:next}]);
+}
+function deliver(q){
+  const P=S.play;const dn=byId(P.T.npcs,q.deliver_npc||q.giver_npc);if(dn)say('sys',`你回到${dn.name}那里交付任务。`);
+  runDialog(q,'deliver',()=>{
+    const r=q.reward||{};const xp=questXp(q);P.xp+=xp;P.gold+=Number(r.gold)||0;
+    const got=(r.item_ids||[]).map(id=>byId(P.T.items,id)).filter(Boolean);got.forEach(it=>{P.inv[it.id]=(P.inv[it.id]||0)+1;if(it.kind==='weapon')P.wTier=Math.max(P.wTier,Number(it.tier)||1);if(it.kind==='armor')P.aTier=Math.max(P.aTier,Number(it.tier)||1)});
+    (q.set_flags||[]).forEach(f=>{P.flags[f.flag]=f.value});
+    say('heal',`任务完成：+${xp} 经验，+${Number(r.gold)||0} 金币${got.length?'，获得 '+got.map(i=>i.name).join('、'):''}${r.unlock?'，解锁 '+r.unlock:''}`);
+    levelCheck();P.done.add(q.id);P.q=null;choose([{t:'继续',f:hub}]);
+  });
+}
+function ending(){
+  const P=S.play;const ends=S.stages[4]?.data?.endings||[];const left=P.order.filter(x=>!P.done.has(x.id));const mainLeft=left.filter(x=>x.kind==='main');
+  if(mainLeft.length){say('sys','没有可接的任务了，但主线还没走完。剩余任务的前置 flag 没有满足：'+left.map(x=>x.id+'（需要 '+(x.prereq_flags||[]).join('、')+'）').join('；'));choose([{t:'结束试玩',f:()=>{S.play=null;render()}}]);return}
+  const hit=ends.find(e=>e.condition&&String(e.condition).trim()&&flagOk(e.condition,P.flags))||ends.find(e=>!e.condition||!String(e.condition).trim())||ends[0];
+  if(hit)say('end',`结局「${hit.name}」${hit.summary?'：'+hit.summary:''}${ends.length>1?`（共 ${ends.length} 个结局，由 flag 决定；本次 flag：${Object.entries(P.flags).map(([k,v])=>k+'='+v).join('、')||'无'}）`:''}`);
+  else say('sys','全部任务完成，试玩结束。（环节 4 没有结局表）');
+  P.ended=true;choose([{t:'结束试玩',f:()=>{S.play=null;render()}}]);
+}
+function levelCheck(){const P=S.play;while(P.xp>=xpNeed(P.L)){P.xp-=xpNeed(P.L);P.L++;const ps=playerStats(P.L,P.wTier,P.aTier);P.hp=ps.hp;P.fp=ps.fp;say('heal',`升到 ${P.L} 级！HP ${ps.hp}，攻击 ${ps.atk}，防御 ${ps.def}`)}}
+function startBattle(members,onWin,onLose){
+  const P=S.play;P.battle={members:members.map(e=>({e,s:enemyStats(e),hp:enemyStats(e).hp})),i:0,onWin,onLose,turn:1};battleTurn();
+}
+function battleTurn(){
+  const P=S.play,B=P.battle;const cur=B.members[B.i];if(!cur){B.onWin();P.battle=null;return}
+  const ps=playerStats(P.L,P.wTier,P.aTier);
+  const skills=P.T.skills.filter(s=>(Number(s.unlock_level)||1)<=P.L).slice(0,3);
+  const potions=P.T.items.filter(i=>i.effect_type==='heal_hp'&&P.inv[i.id]>0);
+  say('sys',`[第 ${B.turn} 回合] ${cur.e.name}（${cur.e.type||''}，HP ${cur.hp}/${cur.s.hp}${cur.e.weakness?'，弱点 '+cur.e.weakness:''}）`);
+  const act=(label,fn)=>({t:label,f:()=>{fn();if(cur.hp<=0){say('heal',`${cur.e.name} 被击败，+${cur.s.xp} 经验`);P.xp+=cur.s.xp;levelCheck();B.i++;B.turn=1;battleTurn();return}
+    const dmg=Math.max(1,Math.round((cur.s.atk-ps.def)*(0.85+Math.random()*0.3)));P.hp-=dmg;say('dmg',`${cur.e.name} 攻击你，-${dmg} HP`);
+    if(P.hp<=0){P.hp=0;P.battle=null;B.onLose();return}B.turn++;battleTurn()}});
+  const hit=(mult,elem)=>{let d=Math.max(1,Math.round((ps.atk*mult-cur.s.def)*(0.85+Math.random()*0.3)));if(elem&&cur.e.weakness&&elem===cur.e.weakness){d=Math.round(d*1.5);say('sys','命中弱点！')}cur.hp-=d;say('dmg',`你造成 ${d} 伤害`)};
+  const list=[act('普通攻击',()=>hit(1,null))];
+  skills.forEach(s=>{const cost=Number(s.cost)||0;list.push({t:`${s.name}（${cost} FP${s.element&&s.element!=='无'?'，'+s.element:''}）`,f:()=>{if(P.fp<cost){say('sys','FP 不够');choose(list);return}act(s.name,()=>{P.fp-=cost;hit(Number(s.power)||1.5,s.element)}).f()}})});
+  potions.forEach(p=>list.push({t:`${p.name}（剩 ${P.inv[p.id]}）`,f:()=>act(p.name,()=>{P.inv[p.id]--;const h=Math.round(ps.hp*curve().potion_heal_ratio);P.hp=Math.min(ps.hp,P.hp+h);say('heal',`回复 ${h} HP`)}).f()}));
+  list.push({t:'逃跑（回到这一步开始）',f:()=>{P.battle=null;say('sys','你逃走了。');choose([{t:'再试一次',f:()=>doStep(P.q)},{t:'放弃这个任务',f:()=>{P.done.add(P.q.id);hub()}}])}});
+  choose(list);
+}
+function speakerPortrait(name){
+  const P=S.play;if(!name||name==='旁白')return null;
+  if(name===P.T.hero.name)return portraitOf('hero');
+  const x=P.T.npcs.find(n=>n.name===name);return x?portraitOf(x.id):null;
+}
+function renderPlay(){
+  const P=S.play;const ps=playerStats(P.L,P.wTier,P.aTier);
+  const line=l=>{if(l.k==='sp'){const pt=speakerPortrait(l.who);return `<div class="line">${pt?`<img src="${esc(pt)}" alt="">`:''}<p><span class="sp">${esc(l.who)}</span>：${esc(l.t)}</p></div>`}return `<p class="${l.k}">${esc(l.t)}</p>`};
+  const steps=P.q?stepsOf(P.q):[];
+  $('#work').innerHTML=`<div class="row" style="margin-bottom:10px"><h2 style="margin:0;flex:1">文本试玩</h2><button class="btn" id="btnQuit">退出试玩</button></div>
+  <div class="play"><div><div class="log" id="log">${P.log.map(line).join('')}</div><div class="choices">${P.choices.map((c,i)=>`<button class="btn" data-c="${i}">${esc(c.t)}</button>`).join('')}</div></div>
+  <div class="stat">${portraitOf('hero')?`<img class="hero" src="${esc(portraitOf('hero'))}" alt="">`:''}<div><b>${esc(P.T.hero.name||'主角')}</b> · Lv ${P.L}</div>HP ${P.hp}/${ps.hp}<div class="bar"><i style="width:${Math.max(0,P.hp/ps.hp*100)}%"></i></div>FP ${P.fp}/${ps.fp}<div class="bar fp"><i style="width:${Math.max(0,P.fp/ps.fp*100)}%"></i></div><div>经验 ${P.xp}/${xpNeed(P.L)} · 金币 ${P.gold}</div><div>攻击 ${ps.atk} · 防御 ${ps.def}</div><div class="hint" style="margin-top:6px">所在：${esc(locName(P.loc))}</div><div class="hint">背包：${Object.entries(P.inv).filter(([k,v])=>v>0).map(([k,v])=>(byId(P.T.items,k)?.name||k)+'×'+v).join('、')||'空'}</div>
+  <div style="margin-top:8px"><b>任务日志</b> <span class="hint">${P.done.size}/${P.order.length}</span></div><ul class="qlog">${P.q?`<li class="cur">${esc(P.q.name)}${steps.length?`<br><span class="hint">${steps.map((s,i)=>(i<P.step?'✓ ':i===P.step?'▶ ':'· ')+esc(s.desc||s.type)).join('<br>')}</span>`:''}</li>`:''}${P.order.filter(q=>P.done.has(q.id)).map(q=>`<li style="color:var(--muted)">✓ ${esc(q.name)}</li>`).join('')}</ul>
+  <div class="hint" style="margin-top:6px">flag：${Object.entries(P.flags).map(([k,v])=>k+'='+v).join('、')||'无'}</div></div></div>`;
+  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const c=P.choices[Number(b.dataset.c)];P.choices=[];c.f()});
+  $('#btnQuit').onclick=()=>{S.play=null;render()};
+  const lg=$('#log');if(lg)lg.scrollTop=lg.scrollHeight;
+  renderRail();
+}
+
+/* ---------- boot ---------- */
+/* ---------- standalone mode: no claude.ai runtime, talk to our own backend (server.js) ---------- */
+const IDB={h:null,open(){return new Promise((res,rej)=>{const r=indexedDB.open('rpgws',1);r.onupgradeneeded=()=>r.result.createObjectStore('blobs');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
+  async put(id,blob){const db=this.h||(this.h=await this.open());return new Promise((res,rej)=>{const t=db.transaction('blobs','readwrite');t.objectStore('blobs').put(blob,id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})},
+  async all(){const db=this.h||(this.h=await this.open());return new Promise((res,rej)=>{const out={};const req=db.transaction('blobs').objectStore('blobs').openCursor();req.onsuccess=()=>{const c=req.result;if(c){out[c.key]=c.value;c.continue()}else res(out)};req.onerror=()=>rej(req.error)})}};
+/* ---------- model config: claude.ai runtime / own backend (server.js) / direct from the browser with the user's key ---------- */
+const CFG_DEF={text:{mode:'auto',base:'',key:'',model:''},img:{mode:'off',base:'',key:'',model:'',size:'1024x1024'},backend:{base:'',token:''}};
+function cfgGet(){let c={};try{c=JSON.parse(localStorage.getItem('rpgws:cfg')||'{}')}catch(e){}
+  if(!c.backend){try{const old=JSON.parse(localStorage.getItem('rpgws:api')||'null');if(old)c.backend=old}catch(e){}}
+  return {text:Object.assign({},CFG_DEF.text,c.text||{}),img:Object.assign({},CFG_DEF.img,c.img||{}),backend:Object.assign({},CFG_DEF.backend,c.backend||{})}}
+function cfgSet(c){try{localStorage.setItem('rpgws:cfg',JSON.stringify(c))}catch(e){}}
+const apiHeaders=(b,json)=>Object.assign(json?{'content-type':'application/json'}:{},b.token?{'x-app-token':b.token}:{});
+const beBase=b=>(b.base||'').replace(/\/$/,'');
+const llmHeaders=t=>{const h={'content-type':'application/json',authorization:'Bearer '+t.key};if(/anthropic\.com/.test(t.base)){h['x-api-key']=t.key;h['anthropic-dangerous-direct-browser-access']='true'}return h};
+const errOf=(e,o,text)=>({code:o&&o.signal&&o.signal.aborted?'cancelled':'network',message:String(e&&e.message||e),text});
+const promptOf=input=>typeof input==='string'?input:input.map(m=>m.content).join('\n');
+function jsonOf(text){const s=text.indexOf('{'),e=text.lastIndexOf('}');if(s<0||e<=s)throw {code:'bad_json',message:'模型回复里没有 JSON 对象',text};try{return JSON.parse(text.slice(s,e+1))}catch(err){throw {code:'bad_json',message:'JSON 解析失败：'+err.message,text}}}
+function withJson(fn){fn.json=async(input,o)=>jsonOf((await fn(input,o)).text);fn.limits=async()=>({images:false});return fn}
+async function readStream(r,o,onChunk){const rd=r.body.getReader();const dec=new TextDecoder();let text='',buf='';
+  while(true){const {value,done}=await rd.read();if(done)break;const part=dec.decode(value,{stream:true});
+    if(onChunk){buf+=part;let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).trim();buf=buf.slice(i+1);const d=onChunk(line);if(d)text+=d}}else text+=part;
+    if(o.onText)o.onText({text,delta:''})}
+  return text}
+const sseDelta=line=>{if(!line.startsWith('data:'))return '';const d=line.slice(5).trim();if(d==='[DONE]')return '';try{const j=JSON.parse(d);const c=j.choices&&j.choices[0]&&j.choices[0].delta&&j.choices[0].delta.content;return typeof c==='string'?c:''}catch(e){return ''}};
+// text via our backend
+const backendSample=()=>withJson(async(input,o={})=>{const b=cfgGet().backend;const base=beBase(b);let r;
+  try{r=await fetch(base+'/api/generate',{method:'POST',headers:apiHeaders(b,true),body:JSON.stringify({prompt:promptOf(input),tier:o.modelTier||'default'}),signal:o.signal})}
+  catch(e){throw errOf({message:'连不上后端（'+(base||'同源')+'/api/generate）：'+e.message+'。点右上角"设置"检查。'},o)}
+  if(!r.ok){let m='';try{m=(await r.json()).error||''}catch(e){}throw {code:r.status===401?'not_authorized':'server',message:`后端返回 ${r.status}${m?'：'+m:''}`}}
+  let text='';try{text=await readStream(r,o,null)}catch(e){throw errOf(e,o,text)}return {text,truncated:false}});
+// text straight from the browser with the user's own key (OpenAI-compatible chat/completions)
+const directSample=()=>withJson(async(input,o={})=>{const t=cfgGet().text;let r;
+  try{r=await fetch(t.base.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:llmHeaders(t),body:JSON.stringify({model:t.model,stream:true,temperature:0.7,max_tokens:8192,messages:[{role:'user',content:promptOf(input)}]}),signal:o.signal})}
+  catch(e){throw errOf({message:'连不上 '+t.base+'：'+e.message+'。可能是这个接口不允许浏览器直连（跨域），改用后端模式。'},o)}
+  if(!r.ok){const txt=await r.text().catch(()=>'');throw {code:r.status===401?'not_authorized':'server',message:`接口返回 ${r.status}：${txt.slice(0,200)}`}}
+  let text='';try{text=await readStream(r,o,sseDelta)}catch(e){throw errOf(e,o,text)}return {text,truncated:false}});
+function applyCfg(){const c=cfgGet();const mode=c.text.mode==='auto'?(S.claudeSample?'claude':'backend'):c.text.mode;
+  S.textMode=mode;S.sample=mode==='claude'?S.claudeSample:mode==='direct'?(c.text.base&&c.text.key?directSample():null):backendSample();
+  if(mode==='direct'&&!S.sample)toast('直连模式还没填接口地址和 key');}
+const imgReady=()=>{const c=cfgGet();return c.img.mode==='backend'||(c.img.mode==='direct'&&!!(c.img.base&&c.img.key))};
+const b64ToBlob=(b64,mime)=>{const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime||'image/png'})};
+async function genImage(prompt){const c=cfgGet();const im=c.img;
+  if(im.mode==='backend'){const b=c.backend;const r=await fetch(beBase(b)+'/api/image',{method:'POST',headers:apiHeaders(b,true),body:JSON.stringify({prompt,size:im.size||'1024x1024'})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('后端返回 '+r.status));if(j.b64)return b64ToBlob(j.b64,j.mime);if(j.url)return {url:j.url};throw new Error('后端没有返回图片')}
+  if(im.mode!=='direct')throw new Error('还没有配置图片模型，点右上角"⚙ 设置"');
+  const call=async(withFmt)=>{const body={model:im.model,prompt,n:1,size:im.size||'1024x1024'};if(withFmt)body.response_format='b64_json';return fetch(im.base.replace(/\/$/,'')+'/images/generations',{method:'POST',headers:llmHeaders(im),body:JSON.stringify(body)})};
+  let r;try{r=await call(true);if(r.status===400){const t=await r.clone().text();if(/response_format/i.test(t))r=await call(false)}}catch(e){throw new Error('连不上 '+im.base+'：'+e.message+'。可能是接口不允许浏览器直连，改用后端模式。')}
+  if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(`接口返回 ${r.status}：${t.slice(0,200)}`)}
+  const j=await r.json();const d=(j.data&&j.data[0])||(j.images&&j.images[0])||{};
+  if(d.b64_json)return b64ToBlob(d.b64_json,'image/png');
+  if(d.url){try{const rr=await fetch(d.url);if(rr.ok)return await rr.blob()}catch(e){}return {url:d.url}}
+  throw new Error('接口没有返回图片：'+JSON.stringify(j).slice(0,160))}
+async function storeBlob(blob){if(S.assets){const r=await S.assets.upload(blob);return r.id}const id='local_'+uid();await IDB.put(id,blob);S.blobs[id]=URL.createObjectURL(blob);return id}
+async function genPortrait(cid){const d=S.stages[3]?.data;const ch=(d?.characters||[]).find(c=>c.id===cid);if(!ch)return;
+  const prompt=(ch.portrait_prompt_en||ch.portrait_prompt_zh||'').trim();if(!prompt){toast(ch.name+' 没有生图 prompt');return}
+  S.genImg.add(cid);render();
+  try{const out=await genImage(prompt+(ch.negative_prompt?'. Avoid: '+ch.negative_prompt:''));
+    if(out instanceof Blob){ch.portrait_id=await storeBlob(out);delete ch.portrait_url}else{ch.portrait_url=out.url;delete ch.portrait_id}
+    const m=stMeta(3);m.imgRuns=(m.imgRuns||0)+1;await saveStage(3);toast(ch.name+' 的立绘已生成')}
+  catch(e){toast('生成失败：'+(e.message||e))}
+  S.genImg.delete(cid);render()}
+async function genAllPortraits(){const chars=(S.stages[3]?.data?.characters||[]).filter(c=>!portraitUrl(c));for(const c of chars){if(S.cur!==3)break;await genPortrait(c.id)}}
+/* settings sheet */
+function cfgUI(){
+  const cfgEl=$('#cfg');const radios=(id,name,opts,cur)=>{$(id).innerHTML=opts.map(([v,l])=>`<label class="hint" style="font-size:13px;color:var(--ink)"><input type="radio" name="${name}" value="${v}" ${v===cur?'checked':''}> ${l}</label>`).join('')};
+  const sync=()=>{const tm=document.querySelector('input[name=tmode]:checked')?.value,im=document.querySelector('input[name=imode]:checked')?.value;$('#cfgTextDirect').hidden=tm!=='direct';$('#cfgTextBackend').hidden=!(tm==='backend'||im==='backend');$('#cfgImgDirect').hidden=im!=='direct';$('#cfgImgBackend').hidden=im!=='backend'};
+  const open=()=>{const c=cfgGet();const hasClaude=!!S.claudeSample;
+    $('#cfgLead').textContent=hasClaude?'这个页面运行在 claude.ai 里，文本默认用页面自带的 Claude，不用配置。想换别的模型、或者要在环节 3 直接生成立绘，在这里填接口和 key。':'这是独立版：文本和图片都要经过你自己的后端（server.js，key 放在后端），或者在这里填 key 让浏览器直接调接口。';
+    radios('#cfgTextModes','tmode',[...(hasClaude?[['claude','页面自带的 Claude（默认）']]:[]),['backend','经过自己的后端 server.js'],['direct','浏览器直连，填 key']],c.text.mode==='auto'?(hasClaude?'claude':'backend'):c.text.mode);
+    radios('#cfgImgModes','imode',[['off','不在页面里生成（拿 prompt 手动出图）'],['direct','浏览器直连，填 key'],['backend','经过自己的后端 server.js']],c.img.mode);
+    $('#cfgTBase').value=c.text.base;$('#cfgTKey').value=c.text.key;$('#cfgTModel').value=c.text.model;$('#cfgBase').value=c.backend.base;$('#cfgToken').value=c.backend.token;
+    $('#cfgIBase').value=c.img.base;$('#cfgIKey').value=c.img.key;$('#cfgIModel').value=c.img.model;$('#cfgISize').value=c.img.size;$('#cfgMsgT').textContent='';$('#cfgMsgI').textContent='';
+    document.querySelectorAll('input[name=tmode],input[name=imode]').forEach(r=>r.onchange=sync);sync();cfgEl.hidden=false};
+  const read=()=>({text:{mode:document.querySelector('input[name=tmode]:checked')?.value||'auto',base:$('#cfgTBase').value.trim(),key:$('#cfgTKey').value.trim(),model:$('#cfgTModel').value.trim()},img:{mode:document.querySelector('input[name=imode]:checked')?.value||'off',base:$('#cfgIBase').value.trim(),key:$('#cfgIKey').value.trim(),model:$('#cfgIModel').value.trim(),size:$('#cfgISize').value.trim()||'1024x1024'},backend:{base:$('#cfgBase').value.trim(),token:$('#cfgToken').value.trim()}});
+  $('#btnCfg').onclick=open;$('#btnCfgClose').onclick=()=>{cfgEl.hidden=true};cfgEl.onclick=e=>{if(e.target.id==='cfg')cfgEl.hidden=true};
+  $('#btnCfgSave').onclick=()=>{cfgSet(read());applyCfg();cfgEl.hidden=true;toast('设置已生效');render()};
+  const health=async(b)=>{const r=await fetch(beBase(b)+'/api/health',{headers:apiHeaders(b,false)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(`后端返回 ${r.status}${j.error?'：'+j.error:''}`);return j};
+  $('#btnCfgTestT').onclick=async()=>{const c=read();const m=$('#cfgMsgT');m.textContent='测试中…';try{
+    if(c.text.mode==='claude')m.textContent='用页面自带的 Claude，第一次生成时会弹授权，不用测试。';
+    else if(c.text.mode==='backend'){const j=await health(c.backend);m.textContent=`已连接后端：文本模型 ${j.model||'?'}（${j.base||''}）${j.hasKey?'':'，但后端没配 LLM_API_KEY'}`}
+    else{if(!c.text.base||!c.text.key)throw new Error('先填接口地址和 key');const r=await fetch(c.text.base.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:llmHeaders(c.text),body:JSON.stringify({model:c.text.model,max_tokens:5,messages:[{role:'user',content:'回复 ok'}]})});const t=await r.text();if(!r.ok)throw new Error(`接口返回 ${r.status}：${t.slice(0,160)}`);m.textContent='直连成功：'+(c.text.model||'?')}}
+    catch(e){m.textContent='失败：'+(e.message||e)}};
+  $('#btnCfgTestI').onclick=async()=>{const c=read();const m=$('#cfgMsgI');m.textContent='测试中…';try{
+    if(c.img.mode==='off')m.textContent='没有启用页面内生图。';
+    else if(c.img.mode==='backend'){const j=await health(c.backend);m.textContent=j.imgModel?`已连接后端：图片模型 ${j.imgModel}`:'后端在线，但 .env 里没配 IMG_MODEL / IMG_API_KEY'}
+    else{if(!c.img.base||!c.img.key)throw new Error('先填接口地址和 key');const r=await fetch(c.img.base.replace(/\/$/,'')+'/models',{headers:llmHeaders(c.img)});if(r.status===401||r.status===403)throw new Error('key 不对（'+r.status+'）');m.textContent=r.ok?'接口可达，key 有效；真正出图在环节 3 点"生成立绘"（会计费）':'接口可达（/models 返回 '+r.status+'），key 是否有效要到环节 3 生成时才知道'}}
+    catch(e){m.textContent='失败：'+(e.message||e)}};
+}
+async function standalone(){
+  S.standalone=true;S.db=null;S.user=null;
+  S.downloads={save:async({filename,data})=>{const blob=data instanceof Blob?data:new Blob([data]);const u=URL.createObjectURL(blob);
+    const ext=(String(filename).match(/\.[A-Za-z0-9]+$/)||[''])[0];const ascii=String(filename).slice(0,filename.length-ext.length).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'');const fn=(/[A-Za-z]/.test(ascii)?ascii:'rpg-pack-'+new Date().toISOString().slice(0,10))+ext; // 部分浏览器会丢掉非 ASCII 文件名
+    const a=document.createElement('a');a.href=u;a.download=fn;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);return {status:'saved'}}};
+  S.assets={upload:async f=>{const id='local_'+uid();await IDB.put(id,f);S.blobs[id]=URL.createObjectURL(f);return {id,url:S.blobs[id],sizeBytes:f.size,contentType:f.type}}};
+  const c=cfgGet();if(c.text.mode==='auto'||c.text.mode==='backend'){if(!c.backend.base&&!c.backend.token){try{const r=await fetch('/api/health');if(!r.ok)throw 0}catch(e){toast('独立版：先点右上角"⚙ 设置"填后端地址，或填 key 直连')}}}
+}
+async function boot(hot){
+  $('#btnNew').onclick=newProject;$('#btnExport').onclick=exportZip;$('#btnPlay').onclick=()=>{if(S.play){S.play=null;render()}else startPlay()};
+  $('#tier').onchange=e=>S.tier=e.target.value;
+  $('#btnHelp').onclick=()=>{$('#help').hidden=false};$('#btnHelpClose').onclick=()=>{$('#help').hidden=true};$('#help').onclick=e=>{if(e.target.id==='help')$('#help').hidden=true};
+  render();
+  if(window.claude?.use){
+    const [db,sample,downloads,user,assets]=await Promise.all([claude.use('db'),claude.use('sample'),claude.use('downloads'),claude.use('user'),claude.use('assets')]);
+    S.db=db;S.claudeSample=sample;S.sample=sample;S.downloads=downloads;S.user=user;S.assets=assets;
+    if(user){try{const can=await user.can('data.write');if(can===false)S.db=null}catch(e){}}
+  }else{await standalone()}
+  try{const all=await IDB.all();for(const [k,b] of Object.entries(all))S.blobs[k]=URL.createObjectURL(b)}catch(e){console.warn('IndexedDB 不可用',e)}
+  cfgUI();applyCfg();
+  await listProjects();
+  let want=(hot&&hot.pid)||null;try{want=want||localStorage.getItem('rpgws:last')}catch(e){}
+  if(want&&S.projects.some(p=>p.id===want)){await loadProject(want);S.cur=(hot&&hot.cur)||0}
+  else if(S.projects.length){await loadProject(S.projects[0].id)}
+  render();
+}
+window.claude?.hot?.snapshot?.(()=>({pid:S.pid,cur:S.cur}));
+window.addEventListener('beforeunload',()=>{try{if(S.pid)localStorage.setItem('rpgws:last',S.pid)}catch(e){}});
+(window.claude?.hot?.ready)?window.claude.hot.ready(boot):boot(window.claude?.hot?.data??{});
+</script>
+
+</body>
+</html>
