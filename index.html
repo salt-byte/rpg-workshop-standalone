@@ -235,7 +235,7 @@ span[contenteditable]:focus{outline:2px solid var(--accent);outline-offset:1px;b
       <div class="row" style="margin-top:8px"><button class="btn" id="btnCfgTestT">测试文本模型</button><span class="hint" id="cfgMsgT"></span></div></div>
     <div class="card"><h3 style="margin:0 0 6px">图片模型：在环节 3 直接生成立绘</h3>
       <div class="row" id="cfgImgModes"></div>
-      <div id="cfgImgDirect" hidden><div class="vars" style="margin-top:8px"><label class="f"><span>接口地址（OpenAI 兼容的 images/generations）</span><input type="text" id="cfgIBase" placeholder="https://api.siliconflow.cn/v1"></label><label class="f"><span>API key</span><input type="password" id="cfgIKey" autocomplete="off"></label><label class="f"><span>模型名</span><input type="text" id="cfgIModel" placeholder="Kwai-Kolors/Kolors"></label><label class="f"><span>尺寸</span><input type="text" id="cfgISize" placeholder="1024x1024"></label></div><p class="hint" style="margin:0">支持 OpenAI（gpt-image-1 / dall-e-3）、硅基流动（Kolors、FLUX）、智谱 CogView 等走 images/generations 的接口。Midjourney、即梦、通义万相不是这个格式，用它们就拿 prompt 手动生成再上传。</p></div>
+      <div id="cfgImgDirect" hidden><div class="vars" style="margin-top:8px"><label class="f"><span>接口地址（OpenAI 兼容的 images/generations）</span><input type="text" id="cfgIBase" placeholder="https://api.siliconflow.cn/v1"></label><label class="f"><span>API key</span><input type="password" id="cfgIKey" autocomplete="off"></label><label class="f"><span>模型名</span><input type="text" id="cfgIModel" placeholder="Kwai-Kolors/Kolors"></label><label class="f"><span>尺寸（Seedream 填 2K）</span><input type="text" id="cfgISize" placeholder="1024x1024 或 2K"></label></div><p class="hint" style="margin:0">支持 OpenAI（gpt-image-1 / dall-e-3）、硅基流动（Kolors、FLUX）、智谱 CogView 等走 images/generations 的接口。Midjourney、即梦、通义万相不是这个格式，用它们就拿 prompt 手动生成再上传。</p></div>
       <div id="cfgImgBackend" hidden><p class="hint" style="margin:8px 0 0">用上面"后端"那组地址和口令，图片模型在后端 .env 的 IMG_* 里配置。</p></div>
       <div class="row" style="margin-top:8px"><button class="btn" id="btnCfgTestI">测试图片模型</button><span class="hint" id="cfgMsgI"></span></div></div>
     <div class="row"><button class="btn primary" id="btnCfgSave">保存并应用</button><span class="hint">保存后立刻生效，不用刷新。</span></div>
@@ -1107,11 +1107,14 @@ function applyCfg(){const c=cfgGet();const mode=c.text.mode==='auto'?(S.claudeSa
   if(mode==='direct'&&!S.sample)toast('直连模式还没填接口地址和 key');}
 const imgReady=()=>{const c=cfgGet();return c.img.mode==='backend'||(c.img.mode==='direct'&&!!(c.img.base&&c.img.key))};
 const b64ToBlob=(b64,mime)=>{const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime||'image/png'})};
+// Seedream 4.5 及以上的最小尺寸是 2K，1024x1024 会被拒；档位写法（1K/2K/4K）原样传
+function imgSize(im){const s=String(im.size||'1024x1024').trim();const m=s.match(/^(\d+)\s*[x*×]\s*(\d+)$/i);if(m&&/seedream/i.test(im.model)&&m[1]*m[2]<2560*1440)return '2K';return s}
 async function genImage(prompt){const c=cfgGet();const im=c.img;
   if(im.mode==='backend'){const b=c.backend;const r=await fetch(beBase(b)+'/api/image',{method:'POST',headers:apiHeaders(b,true),body:JSON.stringify({prompt,size:im.size||'1024x1024'})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('后端返回 '+r.status));if(j.b64)return b64ToBlob(j.b64,j.mime);if(j.url)return {url:j.url};throw new Error('后端没有返回图片')}
   if(im.mode!=='direct')throw new Error('还没有配置图片模型，点右上角"⚙ 设置"');
-  const call=async(withFmt)=>{const body={model:im.model,prompt,n:1,size:im.size||'1024x1024'};if(withFmt)body.response_format='b64_json';return fetch(im.base.replace(/\/$/,'')+'/images/generations',{method:'POST',headers:llmHeaders(im),body:JSON.stringify(body)})};
-  let r;try{r=await call(true);if(r.status===400){const t=await r.clone().text();if(/response_format/i.test(t))r=await call(false)}}catch(e){throw new Error('连不上 '+im.base+'：'+e.message+'。可能是接口不允许浏览器直连，改用后端模式。')}
+  const ark=/volces\.com/.test(im.base);
+  const call=async(withFmt)=>{const body={model:im.model,prompt,n:1,size:imgSize(im)};if(ark)body.watermark=false;if(withFmt)body.response_format='b64_json';return fetch(im.base.replace(/\/$/,'')+'/images/generations',{method:'POST',headers:llmHeaders(im),body:JSON.stringify(body)})};
+  let r;try{r=await call(true);if(r.status===400){const t=await r.clone().text();if(/response_format/i.test(t))r=await call(false)}}catch(e){throw new Error('连不上 '+im.base+'：'+e.message+'。'+(ark?'火山方舟出错时不带跨域头，浏览器只能看到这句：请检查 key、模型名（要用开通了的 Endpoint 或模型 ID）和尺寸（Seedream 填 2K）。':'可能是接口不允许浏览器直连，改用后端模式。'))}
   if(!r.ok){const t=await r.text().catch(()=>'');throw new Error(`接口返回 ${r.status}：${t.slice(0,200)}`)}
   const j=await r.json();const d=(j.data&&j.data[0])||(j.images&&j.images[0])||{};
   if(d.b64_json)return b64ToBlob(d.b64_json,'image/png');
@@ -1150,7 +1153,7 @@ function cfgUI(){
   $('#btnCfgTestI').onclick=async()=>{const c=read();const m=$('#cfgMsgI');m.textContent='测试中…';try{
     if(c.img.mode==='off')m.textContent='没有启用页面内生图。';
     else if(c.img.mode==='backend'){const j=await health(c.backend);m.textContent=j.imgModel?`已连接后端：图片模型 ${j.imgModel}`:'后端在线，但 .env 里没配 IMG_MODEL / IMG_API_KEY'}
-    else{if(!c.img.base||!c.img.key)throw new Error('先填接口地址和 key');const r=await fetch(c.img.base.replace(/\/$/,'')+'/models',{headers:llmHeaders(c.img)});if(r.status===401||r.status===403)throw new Error('key 不对（'+r.status+'）');m.textContent=r.ok?'接口可达，key 有效；真正出图在环节 3 点"生成立绘"（会计费）':'接口可达（/models 返回 '+r.status+'），key 是否有效要到环节 3 生成时才知道'}}
+    else{if(!c.img.base||!c.img.key)throw new Error('先填接口地址和 key');let r;try{r=await fetch(c.img.base.replace(/\/$/,'')+'/models',{headers:llmHeaders(c.img)})}catch(e){m.textContent=`这个接口不支持用 /models 在浏览器里测试（跨域拦截），不代表不能出图。直接去环节 3 点"生成立绘"试一张（会计费）。实际尺寸：${imgSize(c.img)}`;return}if(r.status===401||r.status===403)throw new Error('key 不对（'+r.status+'）');m.textContent=r.ok?'接口可达，key 有效；真正出图在环节 3 点"生成立绘"（会计费）':'接口可达（/models 返回 '+r.status+'），key 是否有效要到环节 3 生成时才知道'}}
     catch(e){m.textContent='失败：'+(e.message||e)}};
 }
 async function standalone(){
