@@ -126,10 +126,12 @@ namespace RPGWorkshop
             return null;
         }
 
-        // 内容包里放了 art/tiles/<名字>.png 就用它替换代码画的瓦片（AI 生成或买的素材都放这里）
+        // 瓦片图片：先找内容包里的 art/tiles/<名字>.png（这一个游戏专用），
+        // 再找模板自带的 StreamingAssets/artkit/tiles/（换内容包也不会丢）；都没有就用代码画的
         public Texture2D TileOverride(string name)
         {
             var path = Path.Combine(root, "art", "tiles", name + ".png");
+            if (!File.Exists(path)) path = Path.Combine(Application.streamingAssetsPath, "artkit", "tiles", name + ".png");
             if (!File.Exists(path)) return null;
             var t = new Texture2D(2, 2) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             return t.LoadImage(File.ReadAllBytes(path)) ? t : null;

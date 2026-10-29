@@ -71,10 +71,12 @@ namespace RPGWorkshop
             return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), Mathf.Max(tex.width, tex.height) / U);
         }
 
-        static Sprite Cached(string key, string overrideName, System.Action<Canvas> draw)
+        // variant 不为空时先找带后缀的变体（比如 tree_1.png），没有再找不带后缀的
+        static Sprite Cached(string key, string overrideName, System.Action<Canvas> draw, string variant = null)
         {
             if (cache.TryGetValue(key, out var s)) return s;
-            s = FromOverride(overrideName);
+            if (variant != null) s = FromOverride(overrideName + variant);
+            if (s == null) s = FromOverride(overrideName);
             if (s == null)
             {
                 var cv = new Canvas();
@@ -97,8 +99,8 @@ namespace RPGWorkshop
             {
                 int v = (int)(Hash(x, y) * 4);
                 return path
-                    ? Cached("dfloor" + v, "dungeon_floor", c => { c.R(0, 0, 12, 12, K.p); c.R(0, 0, 12, 1, K.p3); c.R(0, 6, 12, 1, K.p2); c.R(5, 0, 1, 6, K.p2); c.R(10, 6, 1, 6, K.p2); if (v == 1) c.R(2, 9, 2, 1, K.p3); })
-                    : Cached("dground" + v, "dungeon_floor", c => { c.R(0, 0, 12, 12, K.p); c.R(0, 0, 12, 1, K.p2); c.R(0, 0, 1, 12, K.p2); if (v == 2) c.R(4, 5, 2, 1, K.p3); });
+                    ? Cached("dfloor" + v, "dungeon_floor", c => { c.R(0, 0, 12, 12, K.p); c.R(0, 0, 12, 1, K.p3); c.R(0, 6, 12, 1, K.p2); c.R(5, 0, 1, 6, K.p2); c.R(10, 6, 1, 6, K.p2); if (v == 1) c.R(2, 9, 2, 1, K.p3); }, "_" + v)
+                    : Cached("dground" + v, "dungeon_floor", c => { c.R(0, 0, 12, 12, K.p); c.R(0, 0, 12, 1, K.p2); c.R(0, 0, 1, 12, K.p2); if (v == 2) c.R(4, 5, 2, 1, K.p3); }, "_" + v);
             }
             if (path)
             {
@@ -115,7 +117,7 @@ namespace RPGWorkshop
                     if (d) c.R(0, 11, 12, 1, K.g2);
                     if (l) c.R(0, 0, 1, 12, K.g2);
                     if (r) c.R(11, 0, 1, 12, K.g2);
-                });
+                }, "_" + v);
             }
             int gv = (int)(Hash(x, y) * 10);
             return Cached(g.kind + "grass" + gv, g.kind + "_grass", c =>
@@ -124,7 +126,7 @@ namespace RPGWorkshop
                 for (int i = 0; i < 3; i++) c.R((int)(Hash(gv, i, 3) * 11), (int)(Hash(i, gv, 9) * 10), 1, 2, K.g2);
                 if (gv == 9) { c.R(4, 5, 1, 1, "#f2e36b"); c.R(8, 3, 1, 1, "#f28fb0"); }
                 else if (gv == 0) c.R(3, 6, 2, 1, K.g3);
-            });
+            }, gv == 9 ? "_2" : gv <= 1 ? "_1" : null);
         }
 
         // 障碍层：墙、树、水、房子、门。返回 null 表示这一格没有障碍
@@ -136,11 +138,14 @@ namespace RPGWorkshop
             {
                 case 'T':
                     if (g.kind == "dungeon") return Cached("dvoid", "wall_top", c => c.R(0, 0, 12, 12, "#26252e"));
-                    return Cached(g.kind + "tree", "tree", c =>
+                {
+                    int tv = (int)(Hash(x, y, 5) * 3);
+                    return Cached(g.kind + "tree" + tv, "tree", c =>
                     {
                         c.R(5, 8, 2, 4, "#6b4a2b"); c.R(2, 1, 8, 8, "#2e6b34"); c.R(1, 3, 10, 5, "#2e6b34");
                         c.R(3, 2, 4, 3, "#3f8a43"); c.R(3, 2, 2, 1, "#5aa85b"); c.R(2, 7, 8, 1, "#245729");
-                    });
+                    }, "_" + tv);
+                }
                 case '~':
                 {
                     bool N_(int a, int b) => g.At(a, b) != '~';
@@ -174,7 +179,7 @@ namespace RPGWorkshop
                     if (face)
                     {
                         bool win = Hash(x, y) < .6f;
-                        return Cached("housewall" + win, "house_wall", c =>
+                        return Cached("housewall" + win, win ? "house_wall_window" : "house_wall", c =>
                         {
                             c.R(0, 0, 12, 12, "#d9c8a6"); c.R(0, 0, 12, 1, "#a88b5c"); c.R(0, 11, 12, 1, "#a88b5c");
                             if (win) { c.R(3, 3, 5, 5, "#5a3d2a"); c.R(4, 4, 3, 3, "#8fc3e8"); c.R(5, 4, 1, 3, "#5a3d2a"); }
@@ -220,17 +225,23 @@ namespace RPGWorkshop
                 c.R(2, 9, 1, 1, "#f1c9a0"); c.R(9, 9, 1, 1, "#f1c9a0");
                 c.R(4, 9, 2, 2, "#3b3550"); c.R(6, 9, 2, 2, "#3b3550");
                 if (player) c.R(3, 5, 6, 1, "#f2c14e");
-            });
+            }, player ? null : "_" + (h % Hues.Length));
         }
 
-        public static Sprite Monster() => Cached("monster", "enemy", c =>
+        public static Sprite Monster(string id)
+        {
+            int h = 0;
+            foreach (char ch in id) h = h * 31 + ch;
+            int v = Mathf.Abs(h) % 5;
+            return Cached("monster" + v, "enemy", c =>
         {
             const string col = "#c2453f";
             c.R(2, 11, 8, 1, new Color(0, 0, 0, .25f));
             c.R(2, 4, 8, 7, col); c.R(3, 3, 6, 1, col); c.R(1, 6, 1, 4, col); c.R(10, 6, 1, 4, col);
             c.R(3, 5, 2, 2, "#ffffff"); c.R(7, 5, 2, 2, "#ffffff"); c.R(4, 6, 1, 1, "#111111"); c.R(7, 6, 1, 1, "#111111");
             c.R(4, 9, 4, 1, "#3a0d0d"); c.R(2, 2, 1, 2, col); c.R(9, 2, 1, 2, col);
-        });
+        }, "_" + v);
+        }
 
         public static Sprite Chest(bool open) => Cached("chest" + open, open ? "chest_open" : "chest", c =>
         {

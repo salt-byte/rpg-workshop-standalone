@@ -202,7 +202,7 @@ namespace RPGWorkshop
                 switch (e.type)
                 {
                     case "npc": sr.sprite = PixelArt.Person(e.refId, false); break;
-                    case "troop": sr.sprite = PixelArt.Monster(); break;
+                    case "troop": sr.sprite = PixelArt.Monster(e.refId); break;
                     case "chest": sr.sprite = PixelArt.Chest(opened.Contains(e.id)); break;
                     case "transfer": sr.sprite = PixelArt.Portal(m.kind); sr.sortingOrder = 2; break;
                     default: sr.sprite = PixelArt.Chest(true); break;
