@@ -144,7 +144,7 @@ summary{cursor:pointer;font-weight:600;font-size:13px}
 .mcard img,.mcard .ph{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
 .mcard img{cursor:zoom-in}.mcard .ph{background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700}
 @media (max-width:600px){.ccard{grid-template-columns:minmax(0,1fr)}.ccard img,.ccard .ph{width:100%;height:auto;aspect-ratio:3/4}}
-.mpbox{margin-bottom:14px}.mpwrap{overflow:auto;max-height:70vh;margin:6px 0;border-radius:8px;border:1px solid var(--line);background:#222}.mpwrap canvas{display:block;image-rendering:pixelated;outline:0}.mppad .btn{min-width:44px}.mplog{font-size:13px;line-height:1.6;margin-top:6px;min-height:3em}
+.mpbox{margin-bottom:14px}.mpwrap{overflow:auto;max-height:60vh;margin:6px 0;border-radius:8px;border:1px solid var(--line);background:#222}.mpwrap canvas{display:block;cursor:pointer;image-rendering:pixelated;outline:0}.mppad .btn{min-width:44px}.mplog{font-size:13px;line-height:1.6;margin-top:6px;min-height:3em}
 .lightbox{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
 .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
 .ccard .cn{font-weight:700;margin-bottom:4px}
@@ -1220,7 +1220,7 @@ function buildGrid(m,events,allMaps){
 }
 function mpGrid(mid){const T=tables();const m=T.maps.find(x=>x.id===mid);if(!m)return null;S.mpCache=S.mpCache||{};const key=mid+':'+(m.layout_seed||0)+':'+m.size+':'+JSON.stringify(T.events.filter(e=>e.map_id===mid))+':'+JSON.stringify(m.connections||[]);
   if(S.mpCache[mid]?.key!==key)S.mpCache[mid]={key,G:buildGrid(m,T.events.filter(e=>e.map_id===mid),T.maps)};return S.mpCache[mid].G}
-function mpStart(mid){const T=tables();mid=mid||T.maps[0]?.id;if(!mid)return;const G=mpGrid(mid);S.mp={mid,x:G.spawn.x,y:G.spawn.y,log:[],opened:new Set(),beaten:new Set(),got:[]};mpSay(`来到「${T.maps.find(m=>m.id===mid)?.name||mid}」。方向键 / WASD 移动，走到人、宝箱、敌群上就会触发。`);render()}
+function mpStart(mid){const T=tables();mid=mid||T.maps[0]?.id;if(!mid)return;const G=mpGrid(mid);S.mp={mid,x:G.spawn.x,y:G.spawn.y,log:[],opened:new Set(),beaten:new Set(),got:[]};mpSay(`来到「${T.maps.find(m=>m.id===mid)?.name||mid}」。点格子自动走过去（也可以用方向键 / WASD），点人、宝箱、敌群会走到旁边再触发。`);render()}
 function mpSay(t){S.mp.log.push(t);if(S.mp.log.length>8)S.mp.log.shift()}
 function mpEvAt(G,x,y){return G.evs.find(e=>e.x===x&&e.y===y&&!(e.type==='troop'&&S.mp.beaten.has(e.id)))}
 function npcLine(T,id){const q=T.quests.find(q=>q.giver_npc===id);const d=q&&T.dialogs.find(d=>d.quest_id===q.id&&d.stage==='accept');const n=d&&(d.nodes||[]).find(n=>n.text);return n?n.text:''}
@@ -1239,6 +1239,14 @@ function mpMove(dx,dy){const P=S.mp;if(!P)return;const T=tables();const G=mpGrid
     if(back){const nb=[[1,0],[-1,0],[0,1],[0,-1]].map(([a,b])=>[back.x+a,back.y+b]).find(([a,b])=>a>0&&b>0&&a<G2.W-1&&b<G2.H-1&&!SOLID.has(G2.g[b][a])&&!mpEvAt(G2,a,b));if(nb)[px,py]=nb}
     P.mid=to.id;P.x=px;P.y=py;mpSay(`进入「${to.name||to.id}」。${e.unlock?'（这条通路的解锁条件是 '+e.unlock+'，地图试玩不检查）':''}`);render();return}
   mpDraw()}
+function mpPath(G,from,to){const k=(x,y)=>x+','+y;const prev={[k(from.x,from.y)]:null};const q=[[from.x,from.y]];
+  while(q.length){const[x,y]=q.shift();if(x===to.x&&y===to.y)break;for(const[a,b]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+a,ny=y+b,kk=k(nx,ny);if(kk in prev||nx<0||ny<0||nx>=G.W||ny>=G.H||SOLID.has(G.g[ny][nx]))continue;const e=mpEvAt(G,nx,ny);if(e&&e.type!=='transfer'&&!(nx===to.x&&ny===to.y))continue;prev[kk]=[x,y];q.push([nx,ny])}}
+  if(!(k(to.x,to.y) in prev))return null;const out=[];let c=[to.x,to.y];while(c&&!(c[0]===from.x&&c[1]===from.y)){out.unshift(c);c=prev[k(c[0],c[1])]}return out}
+// 点哪走哪：在格子上算最短路，一格一格走过去；点到人、宝箱、敌群就走到旁边再触发
+function mpWalkTo(tx,ty){const P=S.mp;if(!P)return;const G=mpGrid(P.mid);clearTimeout(S.mpTimer);const mid=P.mid;
+  const path=mpPath(G,{x:P.x,y:P.y},{x:tx,y:ty});if(!path){mpSay('那里走不过去。');mpDraw();return}
+  const step=()=>{if(!S.mp||S.mp.mid!==mid||!path.length)return;const[nx,ny]=path.shift();mpMove(nx-S.mp.x,ny-S.mp.y);if(S.mp&&S.mp.x===nx&&S.mp.y===ny&&S.mp.mid===mid)S.mpTimer=setTimeout(step,70)};step()}
+function mpFollow(){const w=$('.mpwrap'),P=S.mp;if(!w||!P)return;const ts=24;w.scrollLeft=P.x*ts+ts/2-w.clientWidth/2;w.scrollTop=P.y*ts+ts/2-w.clientHeight/2}
 const TILE_C={'.':'#7cb35a',',':'#d8c08a','#':'#3b3a45','T':'#2f6b3a','~':'#3f7fc4','H':'#9a5b3c','+':'#e2b25b'};
 const EV_C={npc:'#ffffff',chest:'#f2c14e',troop:'#e0524f',transfer:'#9b6bff'};
 function mpDraw(){const P=S.mp;const cv=$('#mpCanvas');if(!P||!cv)return;const G=mpGrid(P.mid);if(!G)return;const ts=24;cv.width=G.W*ts;cv.height=G.H*ts;const c=cv.getContext('2d');
@@ -1251,7 +1259,7 @@ function mpDraw(){const P=S.mp;const cv=$('#mpCanvas');if(!P||!cv)return;const G
     if(e.type==='transfer'){c.globalAlpha=.85;c.fillRect(e.x*ts+2,e.y*ts+2,ts-4,ts-4);c.globalAlpha=1}else if(e.type==='chest'){c.fillStyle=P.opened.has(e.id)?'#8a7a55':EV_C.chest;c.fillRect(e.x*ts+4,e.y*ts+6,ts-8,ts-10)}else{c.beginPath();c.arc(cx,cy,ts*.42,0,7);c.fill()}
     const lbl=e.type==='npc'?String(byId(T.npcs,e.ref)?.name||'人')[0]:e.type==='troop'?'敌':e.type==='transfer'?'门':e.type==='chest'?'':'?';c.fillStyle=e.type==='npc'?'#222':'#fff';if(lbl)c.fillText(lbl,cx,cy+1)});
   c.fillStyle='#ff4fa3';c.beginPath();c.arc(P.x*ts+ts/2,P.y*ts+ts/2,ts*.45,0,7);c.fill();c.fillStyle='#fff';c.fillText('我',P.x*ts+ts/2,P.y*ts+ts/2+1);
-  const lg=$('#mpLog');if(lg)lg.innerHTML=P.log.map(esc).join('<br>')+(P.got.length?`<br><span class="hint">背包：${esc(P.got.join('、'))}</span>`:'')}
+  mpFollow();const lg=$('#mpLog');if(lg)lg.innerHTML=P.log.map(esc).join('<br>')+(P.got.length?`<br><span class="hint">背包：${esc(P.got.join('、'))}</span>`:'')}
 function renderMapPlay(d){const maps=d.maps||[];if(!maps.length)return '';const P=S.mp&&maps.some(m=>m.id===S.mp.mid)?S.mp:null;const cur=P&&maps.find(m=>m.id===P.mid);const G=P&&mpGrid(P.mid);
   return `<div class="card mpbox"><div class="row" style="justify-content:space-between"><h3 style="margin:0">可走地图（${maps.length} 张）${cur?` · 现在在「${esc(cur.name||cur.id)}」<span class="hint">${G.W}×${G.H} 格 · ${{town:'村镇',field:'野外',dungeon:'地牢'}[G.kind]}布局</span>`:''}</h3>
   <div class="row">${P?`<select id="mpSel">${maps.map(m=>`<option value="${esc(m.id)}" ${m.id===P.mid?'selected':''}>${esc(m.name||m.id)}</option>`).join('')}</select><button class="btn" id="mpReroll" title="同样的事件，换一种随机布局">换一个布局</button><button class="btn" id="mpQuit">收起</button>`:`<button class="btn primary" id="mpGo">▶ 试走地图</button>`}</div></div>
@@ -1263,6 +1271,7 @@ function bindMapPlay(){const go=$('#mpGo');if(go)go.onclick=()=>mpStart();const 
   const sel=$('#mpSel');if(sel)sel.onchange=()=>mpStart(sel.value);
   const rr=$('#mpReroll');if(rr)rr.onclick=async()=>{const m=(S.stages[8]?.data?.maps||[]).find(x=>x.id===S.mp.mid);if(!m)return;m.layout_seed=(m.layout_seed||0)+1;await saveStage(8);mpStart(m.id)};
   document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{const[a,c]=b.dataset.mv.split(',').map(Number);mpMove(a,c)});
+  const cv=$('#mpCanvas');if(cv)cv.onclick=e=>{const r=cv.getBoundingClientRect();mpWalkTo(Math.floor((e.clientX-r.left)/r.width*cv.width/24),Math.floor((e.clientY-r.top)/r.height*cv.height/24))};
   if(S.mp)mpDraw()}
 document.addEventListener('keydown',e=>{if(!S.mp||S.cur!==8||S.play)return;const t=e.target;if(t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))return;const k={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],W:[0,-1],S:[0,1],A:[-1,0],D:[1,0]}[e.key];if(!k||!$('#mpCanvas'))return;e.preventDefault();mpMove(k[0],k[1])});
 function mapGridsJson(){return tables().maps.map(m=>{const G=mpGrid(m.id);return{map_id:m.id,width:G.W,height:G.H,kind:G.kind,legend:{'.':'草地/空地',',':'路/地板','#':'墙','T':'树','~':'水','H':'房屋','+':'门'},rows:G.g.map(r=>r.join('')),spawn:G.spawn,events:G.evs.map(e=>({id:e.id,type:e.type,ref:e.ref,x:e.x,y:e.y}))}})}
