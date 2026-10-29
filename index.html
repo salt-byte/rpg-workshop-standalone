@@ -144,6 +144,7 @@ summary{cursor:pointer;font-weight:600;font-size:13px}
 .mcard img,.mcard .ph{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
 .mcard img{cursor:zoom-in}.mcard .ph{background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700}
 @media (max-width:600px){.ccard{grid-template-columns:minmax(0,1fr)}.ccard img,.ccard .ph{width:100%;height:auto;aspect-ratio:3/4}}
+.mpbox{margin-bottom:14px}.mpwrap{overflow:auto;max-height:70vh;margin:6px 0;border-radius:8px;border:1px solid var(--line);background:#222}.mpwrap canvas{display:block;image-rendering:pixelated;outline:0}.mppad .btn{min-width:44px}.mplog{font-size:13px;line-height:1.6;margin-top:6px;min-height:3em}
 .lightbox{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
 .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
 .ccard .cn{font-weight:700;margin-bottom:4px}
@@ -386,7 +387,7 @@ function setStatus(n,st){S.P.statuses[String(n)]=st;markSave()}
 const stOf=n=>S.P?.statuses?.[String(n)]||'';
 // 三条线：0-2 是共用的基础；剧情线 4→5→6→7，人物线 3，地图线 8 都只依赖基础，可以各自先出结果
 const DEPS={1:[0],2:[1],3:[2],4:[2],5:[4],6:[5],7:[6],8:[2]};
-const LINES=[{t:'基础',ns:[0,1,2]},{t:'剧情线',r:'文本试玩',ns:[4,5,6,7]},{t:'人物线',r:'三视图',ns:[3]},{t:'地图线',r:'场景图',ns:[8]},{t:'汇总',ns:[9,10]}];
+const LINES=[{t:'基础',ns:[0,1,2]},{t:'剧情线',r:'文本试玩',ns:[4,5,6,7]},{t:'人物线',r:'三视图',ns:[3]},{t:'地图线',r:'可走地图',ns:[8]},{t:'汇总',ns:[9,10]}];
 const unlocked=n=>n===0||n===9||n===10||!!stOf(n)||(DEPS[n]||[]).every(d=>stOf(d)==='done');
 const depsLeft=n=>(DEPS[n]||[]).filter(d=>stOf(d)!=='done');
 
@@ -785,6 +786,7 @@ function renderAIStage(n){
   document.querySelectorAll('[data-genmap]').forEach(b=>b.onclick=()=>genMapArt(b.dataset.genmap));
   const gm=$('#btnGenMaps');if(gm)gm.onclick=genAllMaps;
   const pl=$('#btnPlayLine');if(pl)pl.onclick=startPlay;
+  if(n===8)bindMapPlay();
   document.querySelectorAll('[data-upload]').forEach(inp=>inp.onchange=async()=>{const f=inp.files&&inp.files[0];if(!f)return;
     try{const id=await storeBlob(f);const ch=(S.stages[3].data.characters||[]).find(c=>c.id===inp.dataset.upload);if(ch){ch.portrait_id=id;delete ch.portrait_url;await saveStage(3);toast('立绘已保存');render()}}catch(e){toast('上传失败：'+(e.code||e.message||''))}});
   const apply=$('#btnApply');if(apply)apply.onclick=async()=>{try{const d=JSON.parse($('#jsonEdit').value);if(typeof d!=='object'||Array.isArray(d))throw new Error('顶层必须是对象');const changed=diffEdits(n,st.data,d);const meta=stMeta(n);S.stages[n]={data:d,raw:st.raw||'',updatedAt:Date.now(),meta};const e2=schemaCheck(n,d).filter(i=>i.severity==='error').length;setStatus(n,e2?'fix':'ok');await saveStage(n);toast(changed?`已应用，记住了 ${changed} 行改动`:'已应用');render()}catch(e){$('#jsonMsg').textContent='JSON 无效：'+e.message}};
@@ -809,7 +811,7 @@ function table(arr,o={}){
 }
 function renderData(n,data){
   const keys=Object.keys(data);const arrays=keys.filter(k=>Array.isArray(data[k]));const others=keys.filter(k=>!Array.isArray(data[k]));
-  let html=n===8?renderMapArt(data):'';
+  let html=n===8?renderMapPlay(data)+renderMapArt(data):'';
   if(n===3)return renderDesign(data);
   if(n===7)return renderDialogs(data);
   if(others.length)html+=`<div class="kv">${others.map(k=>`<b>${esc(k)}</b><div>${typeof data[k]==='object'?`<span class="mono">${esc(JSON.stringify(data[k]))}</span>`:esc(data[k])}</div>`).join('')}</div>`;
@@ -937,6 +939,7 @@ async function buildZip(){
     for(const c of (d3.characters||[])){const u=portraitUrl(c);if(!u)continue;try{const r=await fetch(u);if(r.ok){const b=await r.blob();const ext=((b.type.split('/')[1]||'png').replace('jpeg','jpg').replace('svg+xml','svg'));z.file(`design/portraits/${c.id}.${ext}`,b);portraits++}}catch(e){console.warn(e)}}}
   z.file('art/art_requests.md',artMd());
   const {all}=collectIssues();z.file('issues.json',JSON.stringify(all,null,2));z.file('issues.md',issuesMd(all));
+  if(T.maps.length)try{z.file('tables/map_grids.json',JSON.stringify(mapGridsJson(),null,2))}catch(e){console.warn(e)}
   z.file('bundle.json',JSON.stringify(bundle(),null,2));z.file('inputs.json',JSON.stringify(S.P.inputs,null,2));
   let mapImgs=0;
   for(const m of (S.stages[8]?.data?.maps||[])){const u=mapUrl(m);if(!u)continue;try{const r=await fetch(u);if(r.ok){const b=await r.blob();z.file(`art/maps/${m.id}.${(b.type.split('/')[1]||'png').replace('jpeg','jpg')}`,b);mapImgs++}}catch(e){console.warn(e)}}
@@ -1177,6 +1180,92 @@ async function genMapArt(mid){const d=S.stages[8]?.data;const m=(d?.maps||[]).fi
   catch(e){S.imgErr[key]=String(e.message||e);toast((m.name||m.id)+' 生成失败，原因写在卡片上')}
   S.genImg.delete(key);render()}
 async function genAllMaps(){const maps=(S.stages[8]?.data?.maps||[]).filter(m=>!mapUrl(m));for(const m of maps){if(S.cur!==8)break;await genMapArt(m.id)}}
+/* 可走地图：布局由代码按地图类型生成（同一张地图同一个种子，结果固定），NPC/宝箱/敌群/传送点按事件表坐标摆上去，并保证都能走到 */
+function rng(seed){let h=2166136261;for(const c of String(seed))h=Math.imul(h^c.charCodeAt(0),16777619);return()=>{h+=0x6D2B79F5;let t=h;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+function mapDims(m){const r=String(m.size||'').match(/(\d+)\s*[x×*]\s*(\d+)/);const w=r?+r[1]:30,h=r?+r[2]:20;return[Math.max(16,Math.min(60,w)),Math.max(12,Math.min(40,h))]}
+function mapKind(m){const t=(m.type||'')+(m.name||'')+(m.tileset||'');return /地牢|洞|迷宫|遗迹|塔|墓|城堡|地下|dungeon|cave/i.test(t)?'dungeon':/村|镇|城|集|街|town|village|city/i.test(t)?'town':'field'}
+const SOLID=new Set(['#','T','~','H']);
+function buildGrid(m,events,allMaps){
+  const[W,H]=mapDims(m),R=rng(m.id+':'+(m.layout_seed||0)),kind=mapKind(m),ri=(a,b)=>a+Math.floor(R()*(b-a+1));
+  const g=Array.from({length:H},()=>Array(W).fill(kind==='dungeon'?'#':'.'));
+  const inb=(x,y)=>x>0&&y>0&&x<W-1&&y<H-1;const rooms=[];
+  if(kind==='dungeon'){
+    for(let k=0;k<40&&rooms.length<Math.max(4,Math.round(W*H/90));k++){const w=ri(4,8),h=ri(3,6),x=ri(1,W-w-1),y=ri(1,H-h-1);if(rooms.some(r=>x<r.x+r.w+1&&x+w+1>r.x&&y<r.y+r.h+1&&y+h+1>r.y))continue;rooms.push({x,y,w,h});for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)g[j][i]=','}
+    rooms.sort((a,b)=>a.x-b.x);
+  }else{
+    for(let x=0;x<W;x++){g[0][x]='T';g[H-1][x]='T'}for(let y=0;y<H;y++){g[y][0]='T';g[y][W-1]='T'}
+    if(kind==='town'){const my=Math.floor(H/2),mx=Math.floor(W/2);for(let x=1;x<W-1;x++)g[my][x]=',';for(let y=1;y<H-1;y++)g[y][mx]=',';
+      for(let k=0;k<60&&rooms.length<Math.round(W*H/80);k++){const w=ri(4,7),h=ri(3,4),x=ri(2,W-w-2),y=ri(2,H-h-2);if(rooms.some(r=>x<r.x+r.w+2&&x+w+2>r.x&&y<r.y+r.h+2&&y+h+2>r.y)||(my>=y-1&&my<=y+h)||(mx>=x-1&&mx<=x+w))continue;rooms.push({x,y,w,h});for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)g[j][i]='H';g[y+h-1][x+Math.floor(w/2)]='+'}
+      for(let k=0;k<W*H/40;k++){const x=ri(1,W-2),y=ri(1,H-2);if(g[y][x]==='.')g[y][x]='T'}
+    }else{
+      for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++)if(R()<.16)g[y][x]='T';
+      const px=ri(4,W-8),py=ri(3,H-7),rx=ri(2,4),ry=ri(1,3);for(let y=py-ry;y<=py+ry;y++)for(let x=px-rx;x<=px+rx;x++)if(inb(x,y)&&((x-px)/rx)**2+((y-py)/ry)**2<=1)g[y][x]='~';
+    }
+  }
+  const floor=(x,y)=>{if(inb(x,y)&&SOLID.has(g[y][x]))g[y][x]=kind==='town'?',':kind==='dungeon'?',':'.'};
+  const carve=(a,b)=>{let x=a.x,y=a.y;const hf=R()<.5;const stepX=()=>{while(x!==b.x){x+=Math.sign(b.x-x);floor(x,y)}},stepY=()=>{while(y!==b.y){y+=Math.sign(b.y-y);floor(x,y)}};hf?(stepX(),stepY()):(stepY(),stepX())};
+  const cen=r=>({x:r.x+Math.floor(r.w/2),y:r.y+Math.floor(r.h/2)});
+  let spawn=kind==='dungeon'&&rooms.length?cen(rooms[0]):{x:Math.floor(W/2),y:Math.floor(H/2)};
+  if(kind==='dungeon')for(let i=1;i<rooms.length;i++)carve(cen(rooms[i-1]),cen(rooms[i]));
+  if(kind==='town'){spawn={x:Math.floor(W/2),y:Math.floor(H/2)};rooms.forEach(r=>carve({x:r.x+Math.floor(r.w/2),y:r.y+r.h},spawn))}
+  floor(spawn.x,spawn.y);
+  // 事件：坐标夹到地图内，撞位就挪开；事件表里没有、但地图连接里有的出口，补一个传送点
+  const evs=events.map(e=>({...e}));const mapIds=new Set(allMaps.map(x=>x.id));
+  (m.connections||[]).forEach((c,i)=>{if(c.to&&mapIds.has(c.to)&&!evs.some(e=>e.type==='transfer'&&e.ref===c.to))evs.push({id:'auto_'+c.to,map_id:m.id,type:'transfer',ref:c.to,unlock:c.unlock,x:[W-2,1,Math.floor(W/2),Math.floor(W/2)][i%4],y:[Math.floor(H/2),Math.floor(H/2),1,H-2][i%4],auto:true})});
+  const used=new Set([spawn.x+','+spawn.y]);
+  evs.forEach(e=>{let x=Math.max(1,Math.min(W-2,Math.round(Number(e.x)||0))),y=Math.max(1,Math.min(H-2,Math.round(Number(e.y)||0)));let k=0;while(used.has(x+','+y)&&k++<200){x=1+(x+k)%(W-2);if(k%(W-2)===0)y=1+(y%(H-2))}while(g[y][x]==='H'&&y<H-2)y++;used.add(x+','+y);e.x=x;e.y=y;g[y][x]=kind==='dungeon'?',':g[y][x]==='H'||SOLID.has(g[y][x])?',':g[y][x]});
+  // 每个事件都从出生点挖一条路过去，保证能走到（碰撞型事件只要能走到旁边）
+  evs.forEach(e=>carve(spawn,{x:e.x,y:e.y}));
+  return{W,H,g,evs,spawn,kind}
+}
+function mpGrid(mid){const T=tables();const m=T.maps.find(x=>x.id===mid);if(!m)return null;S.mpCache=S.mpCache||{};const key=mid+':'+(m.layout_seed||0)+':'+m.size+':'+JSON.stringify(T.events.filter(e=>e.map_id===mid))+':'+JSON.stringify(m.connections||[]);
+  if(S.mpCache[mid]?.key!==key)S.mpCache[mid]={key,G:buildGrid(m,T.events.filter(e=>e.map_id===mid),T.maps)};return S.mpCache[mid].G}
+function mpStart(mid){const T=tables();mid=mid||T.maps[0]?.id;if(!mid)return;const G=mpGrid(mid);S.mp={mid,x:G.spawn.x,y:G.spawn.y,log:[],opened:new Set(),beaten:new Set(),got:[]};mpSay(`来到「${T.maps.find(m=>m.id===mid)?.name||mid}」。方向键 / WASD 移动，走到人、宝箱、敌群上就会触发。`);render()}
+function mpSay(t){S.mp.log.push(t);if(S.mp.log.length>8)S.mp.log.shift()}
+function mpEvAt(G,x,y){return G.evs.find(e=>e.x===x&&e.y===y&&!(e.type==='troop'&&S.mp.beaten.has(e.id)))}
+function npcLine(T,id){const q=T.quests.find(q=>q.giver_npc===id);const d=q&&T.dialogs.find(d=>d.quest_id===q.id&&d.stage==='accept');const n=d&&(d.nodes||[]).find(n=>n.text);return n?n.text:''}
+function mpMove(dx,dy){const P=S.mp;if(!P)return;const T=tables();const G=mpGrid(P.mid);if(!G)return;const nx=P.x+dx,ny=P.y+dy;if(nx<0||ny<0||nx>=G.W||ny>=G.H)return;
+  const e=mpEvAt(G,nx,ny);
+  if(e&&e.type!=='transfer'){
+    if(e.type==='npc'){const n=byId(T.npcs,e.ref);const line=npcLine(T,e.ref);mpSay(`${n?.name||e.ref}${n?.function?'（'+n.function+'）':''}：${line||'……（这个 NPC 还没有对白，剧情线做完后会有）'}`)}
+    else if(e.type==='chest'){if(P.opened.has(e.id))mpSay('宝箱已经空了。');else{P.opened.add(e.id);const it=byId(T.items,e.ref);P.got.push(it?.name||e.ref);mpSay(`打开宝箱，获得「${it?.name||e.ref}」。`)}}
+    else if(e.type==='troop'){const tr=byId(T.troops,e.ref);const mem=(tr?.members||[]).map(x=>byId(T.enemies,typeof x==='object'?x.enemy_id||x.id:x)?.name||(typeof x==='object'?x.enemy_id||x.id:x)).join('、');P.beaten.add(e.id);mpSay(`遭遇敌群「${tr?.name||e.ref}」${mem?'：'+mem:''}。地图试玩不打战斗，按胜利处理；战斗请在剧情线试玩里测。`)}
+    else mpSay(`触发事件 ${e.id}（${e.type}${e.ref?' → '+e.ref:''}）。`);
+    mpDraw();return}
+  if(SOLID.has(G.g[ny][nx]))return;
+  P.x=nx;P.y=ny;
+  if(e&&e.type==='transfer'){const to=T.maps.find(m=>m.id===e.ref);if(!to){mpSay(`这个传送点通往 ${e.ref}，但地图表里没有这张图。`);mpDraw();return}
+    const G2=mpGrid(to.id);const back=G2.evs.find(x=>x.type==='transfer'&&x.ref===P.mid);let px=G2.spawn.x,py=G2.spawn.y;
+    if(back){const nb=[[1,0],[-1,0],[0,1],[0,-1]].map(([a,b])=>[back.x+a,back.y+b]).find(([a,b])=>a>0&&b>0&&a<G2.W-1&&b<G2.H-1&&!SOLID.has(G2.g[b][a])&&!mpEvAt(G2,a,b));if(nb)[px,py]=nb}
+    P.mid=to.id;P.x=px;P.y=py;mpSay(`进入「${to.name||to.id}」。${e.unlock?'（这条通路的解锁条件是 '+e.unlock+'，地图试玩不检查）':''}`);render();return}
+  mpDraw()}
+const TILE_C={'.':'#7cb35a',',':'#d8c08a','#':'#3b3a45','T':'#2f6b3a','~':'#3f7fc4','H':'#9a5b3c','+':'#e2b25b'};
+const EV_C={npc:'#ffffff',chest:'#f2c14e',troop:'#e0524f',transfer:'#9b6bff'};
+function mpDraw(){const P=S.mp;const cv=$('#mpCanvas');if(!P||!cv)return;const G=mpGrid(P.mid);if(!G)return;const ts=24;cv.width=G.W*ts;cv.height=G.H*ts;const c=cv.getContext('2d');
+  for(let y=0;y<G.H;y++)for(let x=0;x<G.W;x++){const t=G.g[y][x];c.fillStyle=TILE_C[t]||'#7cb35a';c.fillRect(x*ts,y*ts,ts,ts);
+    if(t==='T'){c.fillStyle='#24522c';c.beginPath();c.arc(x*ts+ts/2,y*ts+ts/2,ts*.38,0,7);c.fill()}
+    if(t==='#'){c.fillStyle='#4a4957';c.fillRect(x*ts+1,y*ts+1,ts-2,ts/2-2)}}
+  c.font=`bold ${ts*.55}px sans-serif`;c.textAlign='center';c.textBaseline='middle';
+  const T=tables();
+  G.evs.forEach(e=>{if(e.type==='troop'&&P.beaten.has(e.id))return;const cx=e.x*ts+ts/2,cy=e.y*ts+ts/2;c.fillStyle=EV_C[e.type]||'#cccccc';
+    if(e.type==='transfer'){c.globalAlpha=.85;c.fillRect(e.x*ts+2,e.y*ts+2,ts-4,ts-4);c.globalAlpha=1}else if(e.type==='chest'){c.fillStyle=P.opened.has(e.id)?'#8a7a55':EV_C.chest;c.fillRect(e.x*ts+4,e.y*ts+6,ts-8,ts-10)}else{c.beginPath();c.arc(cx,cy,ts*.42,0,7);c.fill()}
+    const lbl=e.type==='npc'?String(byId(T.npcs,e.ref)?.name||'人')[0]:e.type==='troop'?'敌':e.type==='transfer'?'门':e.type==='chest'?'':'?';c.fillStyle=e.type==='npc'?'#222':'#fff';if(lbl)c.fillText(lbl,cx,cy+1)});
+  c.fillStyle='#ff4fa3';c.beginPath();c.arc(P.x*ts+ts/2,P.y*ts+ts/2,ts*.45,0,7);c.fill();c.fillStyle='#fff';c.fillText('我',P.x*ts+ts/2,P.y*ts+ts/2+1);
+  const lg=$('#mpLog');if(lg)lg.innerHTML=P.log.map(esc).join('<br>')+(P.got.length?`<br><span class="hint">背包：${esc(P.got.join('、'))}</span>`:'')}
+function renderMapPlay(d){const maps=d.maps||[];if(!maps.length)return '';const P=S.mp&&maps.some(m=>m.id===S.mp.mid)?S.mp:null;const cur=P&&maps.find(m=>m.id===P.mid);const G=P&&mpGrid(P.mid);
+  return `<div class="card mpbox"><div class="row" style="justify-content:space-between"><h3 style="margin:0">可走地图（${maps.length} 张）${cur?` · 现在在「${esc(cur.name||cur.id)}」<span class="hint">${G.W}×${G.H} 格 · ${{town:'村镇',field:'野外',dungeon:'地牢'}[G.kind]}布局</span>`:''}</h3>
+  <div class="row">${P?`<select id="mpSel">${maps.map(m=>`<option value="${esc(m.id)}" ${m.id===P.mid?'selected':''}>${esc(m.name||m.id)}</option>`).join('')}</select><button class="btn" id="mpReroll" title="同样的事件，换一种随机布局">换一个布局</button><button class="btn" id="mpQuit">收起</button>`:`<button class="btn primary" id="mpGo">▶ 试走地图</button>`}</div></div>
+  ${P?`<p class="hint" style="margin:6px 0">布局由代码按地图类型（村镇 / 野外 / 地牢）生成，不花钱；人、宝箱、敌群、传送门按事件表的坐标摆放，保证都能走到。色块只是占位，之后可以换成图块素材。图例：<b style="color:#ff4fa3">我</b> 玩家 · 白圆 NPC · 黄块 宝箱 · <b style="color:#e0524f">敌</b> 敌群 · <b style="color:#9b6bff">门</b> 传送点（走上去换地图）</p>
+  <div class="mpwrap"><canvas id="mpCanvas" tabindex="0"></canvas></div>
+  <div class="row mppad"><button class="btn" data-mv="0,-1">↑</button><button class="btn" data-mv="-1,0">←</button><button class="btn" data-mv="0,1">↓</button><button class="btn" data-mv="1,0">→</button></div>
+  <div class="mplog" id="mpLog"></div>`:'<p class="hint" style="margin:6px 0 0">用代码生成每张地图的格子布局，在这里直接走：碰到 NPC 会说话，宝箱能打开，走上传送门会切换地图。这是地图线的试玩结果。</p>'}</div>`}
+function bindMapPlay(){const go=$('#mpGo');if(go)go.onclick=()=>mpStart();const q=$('#mpQuit');if(q)q.onclick=()=>{S.mp=null;render()};
+  const sel=$('#mpSel');if(sel)sel.onchange=()=>mpStart(sel.value);
+  const rr=$('#mpReroll');if(rr)rr.onclick=async()=>{const m=(S.stages[8]?.data?.maps||[]).find(x=>x.id===S.mp.mid);if(!m)return;m.layout_seed=(m.layout_seed||0)+1;await saveStage(8);mpStart(m.id)};
+  document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{const[a,c]=b.dataset.mv.split(',').map(Number);mpMove(a,c)});
+  if(S.mp)mpDraw()}
+document.addEventListener('keydown',e=>{if(!S.mp||S.cur!==8||S.play)return;const t=e.target;if(t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))return;const k={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],W:[0,-1],S:[0,1],A:[-1,0],D:[1,0]}[e.key];if(!k||!$('#mpCanvas'))return;e.preventDefault();mpMove(k[0],k[1])});
+function mapGridsJson(){return tables().maps.map(m=>{const G=mpGrid(m.id);return{map_id:m.id,width:G.W,height:G.H,kind:G.kind,legend:{'.':'草地/空地',',':'路/地板','#':'墙','T':'树','~':'水','H':'房屋','+':'门'},rows:G.g.map(r=>r.join('')),spawn:G.spawn,events:G.evs.map(e=>({id:e.id,type:e.type,ref:e.ref,x:e.x,y:e.y}))}})}
 async function genAllPortraits(){const chars=(S.stages[3]?.data?.characters||[]).filter(c=>!portraitUrl(c));for(const c of chars){if(S.cur!==3)break;await genPortrait(c.id)}}
 /* settings sheet */
 function cfgUI(){
