@@ -1,0 +1,17 @@
+[
+  {
+    "id": "it_herb",
+    "name": "雾草",
+    "kind": "consumable"
+  },
+  {
+    "id": "it_key",
+    "name": "铜钥匙",
+    "kind": "key"
+  },
+  {
+    "id": "it_sword",
+    "name": "旧铁剑",
+    "kind": "weapon"
+  }
+]

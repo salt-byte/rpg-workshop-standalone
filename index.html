@@ -1203,8 +1203,14 @@ function buildGrid(m,events,allMaps){
     }
   }
   const floor=(x,y)=>{if(inb(x,y)&&SOLID.has(g[y][x]))g[y][x]=kind==='town'?',':kind==='dungeon'?',':'.'};
-  const cross=(a,b,hf)=>{let n=0,x=a.x,y=a.y;const sx=()=>{while(x!==b.x){x+=Math.sign(b.x-x);if(g[y][x]==='H')n++}},sy=()=>{while(y!==b.y){y+=Math.sign(b.y-y);if(g[y][x]==='H')n++}};hf?(sx(),sy()):(sy(),sx());return n};
-  const carve=(a,b)=>{let x=a.x,y=a.y;const c1=cross(a,b,true),c2=cross(a,b,false);const hf=c1===c2?R()<.5:c1<c2;const stepX=()=>{while(x!==b.x){x+=Math.sign(b.x-x);floor(x,y)}},stepY=()=>{while(y!==b.y){y+=Math.sign(b.y-y);floor(x,y)}};hf?(stepX(),stepY()):(stepY(),stepX())};
+  // 挖路用最短路：走现成的空地最便宜，穿树/水/墙贵一些，尽量不穿房子
+  const cost=(x,y)=>{const t=g[y][x];return t==='H'?60:SOLID.has(t)?4:1};
+  const carve=(a,b)=>{const N=W*H,dist=new Float64Array(N).fill(Infinity),prev=new Int32Array(N).fill(-1),s=a.y*W+a.x,t=b.y*W+b.x,hp=[[0,s]];dist[s]=0;
+    const push=(d,i)=>{hp.push([d,i]);let k=hp.length-1;while(k>0){const p=(k-1)>>1;if(hp[p][0]<=hp[k][0])break;[hp[p],hp[k]]=[hp[k],hp[p]];k=p}};
+    const pop=()=>{const top=hp[0],last=hp.pop();if(hp.length){hp[0]=last;let k=0;for(;;){const l=2*k+1,r=l+1;let m=k;if(l<hp.length&&hp[l][0]<hp[m][0])m=l;if(r<hp.length&&hp[r][0]<hp[m][0])m=r;if(m===k)break;[hp[m],hp[k]]=[hp[k],hp[m]];k=m}}return top};
+    while(hp.length){const[d,i]=pop();if(d>dist[i])continue;if(i===t)break;const x=i%W,y=(i-x)/W;
+      for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(!inb(nx,ny))continue;const j=ny*W+nx,nd=d+cost(nx,ny)+R()*.01;if(nd<dist[j]){dist[j]=nd;prev[j]=i;push(nd,j)}}}
+    for(let i=t;i!==-1&&i!==s;i=prev[i]){const x=i%W;floor(x,(i-x)/W)}};
   const cen=r=>({x:r.x+Math.floor(r.w/2),y:r.y+Math.floor(r.h/2)});
   let spawn=kind==='dungeon'&&rooms.length?cen(rooms[0]):{x:Math.floor(W/2),y:Math.floor(H/2)};
   if(kind==='dungeon')for(let i=1;i<rooms.length;i++)carve(cen(rooms[i-1]),cen(rooms[i]));

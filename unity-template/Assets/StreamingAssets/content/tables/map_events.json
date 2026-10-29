@@ -1,0 +1,90 @@
+[
+  {
+    "id": "e_v1",
+    "map_id": "map_village",
+    "x": 8,
+    "y": 8,
+    "type": "npc",
+    "ref": "npc_mayor"
+  },
+  {
+    "id": "e_v2",
+    "map_id": "map_village",
+    "x": 22,
+    "y": 8,
+    "type": "npc",
+    "ref": "npc_smith"
+  },
+  {
+    "id": "e_v3",
+    "map_id": "map_village",
+    "x": 12,
+    "y": 15,
+    "type": "npc",
+    "ref": "npc_girl"
+  },
+  {
+    "id": "e_v4",
+    "map_id": "map_village",
+    "x": 27,
+    "y": 17,
+    "type": "chest",
+    "ref": "it_herb"
+  },
+  {
+    "id": "e_f1",
+    "map_id": "map_forest",
+    "x": 10,
+    "y": 12,
+    "type": "npc",
+    "ref": "npc_hunter"
+  },
+  {
+    "id": "e_f2",
+    "map_id": "map_forest",
+    "x": 24,
+    "y": 9,
+    "type": "troop",
+    "ref": "tr_wolves"
+  },
+  {
+    "id": "e_f3",
+    "map_id": "map_forest",
+    "x": 33,
+    "y": 20,
+    "type": "chest",
+    "ref": "it_key"
+  },
+  {
+    "id": "e_c1",
+    "map_id": "map_crypt",
+    "x": 20,
+    "y": 12,
+    "type": "troop",
+    "ref": "tr_bats"
+  },
+  {
+    "id": "e_c2",
+    "map_id": "map_crypt",
+    "x": 34,
+    "y": 18,
+    "type": "troop",
+    "ref": "tr_boss"
+  },
+  {
+    "id": "e_c3",
+    "map_id": "map_crypt",
+    "x": 6,
+    "y": 6,
+    "type": "npc",
+    "ref": "npc_ghost"
+  },
+  {
+    "id": "e_c4",
+    "map_id": "map_crypt",
+    "x": 30,
+    "y": 6,
+    "type": "chest",
+    "ref": "it_sword"
+  }
+]

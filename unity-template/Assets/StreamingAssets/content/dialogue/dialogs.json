@@ -1,0 +1,143 @@
+[
+  {
+    "id": "d_q_01_accept",
+    "quest_id": "q_01",
+    "stage": "accept",
+    "nodes": [
+      {
+        "node_id": "n1",
+        "speaker": "林村长",
+        "text": "你终于来了。这三天，雾一天比一天浓，夜里还能听见森林那边有狼嚎。",
+        "options": [
+          {
+            "text": "雾是从哪儿来的？",
+            "next": "n2",
+            "effects": []
+          },
+          {
+            "text": "我去森林看看。",
+            "next": "n3",
+            "effects": [
+              {
+                "type": "accept_quest"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "node_id": "n2",
+        "speaker": "林村长",
+        "text": "老人们说，是古墓的门开了。可古墓在森林最深处，没人敢去。",
+        "options": [
+          {
+            "text": "我去。",
+            "next": "n3",
+            "effects": [
+              {
+                "type": "accept_quest"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "node_id": "n3",
+        "speaker": "林村长",
+        "text": "往东出村就是雾林。找猎人周，他认得路。",
+        "options": [
+          {
+            "text": "好。",
+            "next": null,
+            "effects": [
+              {
+                "type": "set_flag",
+                "flag": "q_01_accepted",
+                "value": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "d_q_02_accept",
+    "quest_id": "q_02",
+    "stage": "accept",
+    "nodes": [
+      {
+        "node_id": "n1",
+        "speaker": "猎人周",
+        "text": "……村长让你来的？狼群就在前面的空地，绕不过去。",
+        "options": [
+          {
+            "text": "我来对付它们。",
+            "next": "n2",
+            "effects": [
+              {
+                "type": "accept_quest"
+              }
+            ]
+          },
+          {
+            "text": "有别的路吗？",
+            "next": "n3",
+            "effects": []
+          }
+        ]
+      },
+      {
+        "node_id": "n2",
+        "speaker": "猎人周",
+        "text": "打完狼，往东南走，那里有个古墓入口。小心里面的东西。",
+        "options": [
+          {
+            "text": "继续",
+            "next": null,
+            "effects": []
+          }
+        ]
+      },
+      {
+        "node_id": "n3",
+        "speaker": "猎人周",
+        "text": "没有。雾里只有一条路是活的。",
+        "options": [
+          {
+            "text": "那就打。",
+            "next": "n2",
+            "effects": [
+              {
+                "type": "accept_quest"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "d_q_03_accept",
+    "quest_id": "q_03",
+    "stage": "accept",
+    "nodes": [
+      {
+        "node_id": "n1",
+        "speaker": "铁匠阿炳",
+        "text": "喂！要去古墓？我年轻时掉了一把剑在里面，你要是看到，就归你了！",
+        "options": [
+          {
+            "text": "一言为定。",
+            "next": null,
+            "effects": [
+              {
+                "type": "accept_quest"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

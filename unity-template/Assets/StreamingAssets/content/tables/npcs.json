@@ -1,0 +1,37 @@
+[
+  {
+    "id": "npc_mayor",
+    "name": "林村长",
+    "location": "loc_village",
+    "function": "quest_giver",
+    "personality": "说话慢，总是在担心雾。"
+  },
+  {
+    "id": "npc_smith",
+    "name": "铁匠阿炳",
+    "location": "loc_village",
+    "function": "merchant",
+    "personality": "嗓门大，心肠软。"
+  },
+  {
+    "id": "npc_girl",
+    "name": "小满",
+    "location": "loc_village",
+    "function": "info",
+    "personality": "好奇心重，偷偷去过森林。"
+  },
+  {
+    "id": "npc_hunter",
+    "name": "猎人周",
+    "location": "loc_forest",
+    "function": "quest_giver",
+    "personality": "沉默寡言，熟悉森林每一条路。"
+  },
+  {
+    "id": "npc_ghost",
+    "name": "守墓人",
+    "location": "loc_crypt",
+    "function": "info",
+    "personality": "没人知道他在这里待了多久。"
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "q_01",
+    "name": "雾从哪里来",
+    "kind": "main",
+    "giver_npc": "npc_mayor"
+  },
+  {
+    "id": "q_02",
+    "name": "林中狼声",
+    "kind": "main",
+    "giver_npc": "npc_hunter"
+  },
+  {
+    "id": "q_03",
+    "name": "铁匠的委托",
+    "kind": "side",
+    "giver_npc": "npc_smith"
+  }
+]

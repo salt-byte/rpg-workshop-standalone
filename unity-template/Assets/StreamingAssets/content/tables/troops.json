@@ -1,0 +1,26 @@
+[
+  {
+    "id": "tr_wolves",
+    "name": "狼群",
+    "members": [
+      "en_wolf",
+      "en_wolf"
+    ]
+  },
+  {
+    "id": "tr_bats",
+    "name": "蝙蝠群",
+    "members": [
+      "en_bat",
+      "en_bat",
+      "en_bat"
+    ]
+  },
+  {
+    "id": "tr_boss",
+    "name": "墓穴守卫",
+    "members": [
+      "en_skel"
+    ]
+  }
+]

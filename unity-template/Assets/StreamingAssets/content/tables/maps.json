@@ -1,0 +1,42 @@
+[
+  {
+    "id": "map_village",
+    "name": "雾港村",
+    "type": "村庄",
+    "size": "32x22",
+    "connections": [
+      {
+        "to": "map_forest",
+        "unlock": ""
+      }
+    ]
+  },
+  {
+    "id": "map_forest",
+    "name": "雾林",
+    "type": "野外",
+    "size": "40x26",
+    "connections": [
+      {
+        "to": "map_village",
+        "unlock": ""
+      },
+      {
+        "to": "map_crypt",
+        "unlock": "q_02_done"
+      }
+    ]
+  },
+  {
+    "id": "map_crypt",
+    "name": "古墓",
+    "type": "地牢",
+    "size": "40x26",
+    "connections": [
+      {
+        "to": "map_forest",
+        "unlock": ""
+      }
+    ]
+  }
+]
