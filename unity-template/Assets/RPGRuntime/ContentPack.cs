@@ -43,6 +43,9 @@ namespace RPGWorkshop
 
         public static string DefaultRoot => Path.Combine(Application.streamingAssetsPath, "content");
 
+        System.Func<string, object> reader;
+
+        // 电脑版 / 编辑器：读解压后的内容包文件夹
         public static ContentPack Load(string root)
         {
             var p = new ContentPack { root = root };
@@ -51,7 +54,29 @@ namespace RPGWorkshop
                 p.problems.Add("找不到内容包文件夹：" + root + "。在菜单「RPG 工坊 → 导入内容包」里选 RPG 工坊导出的 zip。");
                 return p;
             }
+            p.reader = rel =>
+            {
+                var path = Path.Combine(root, rel);
+                return File.Exists(path) ? MiniJson.Parse(File.ReadAllText(path)) : null;
+            };
+            return p.Build();
+        }
 
+        // 网页版：RPG 工坊把内容打成一个 JSON 传过来，键是内容包里的相对路径，值是那个文件的内容
+        public static ContentPack FromBundle(string json)
+        {
+            var p = new ContentPack { root = "" };
+            Dictionary<string, object> files = null;
+            try { files = MiniJson.Parse(json) as Dictionary<string, object>; }
+            catch (System.Exception e) { p.problems.Add("内容读取失败：" + e.Message); }
+            if (files == null) { p.problems.Add("内容是空的。请回到 RPG 工坊，在环节 8 点「在 Unity 里试玩」。"); return p; }
+            p.reader = rel => files.TryGetValue(rel, out var v) ? v : null;
+            return p.Build();
+        }
+
+        ContentPack Build()
+        {
+            var p = this;
             var grids = Read("tables/map_grids.json", p) as List<object>;
             var mapRows = Read("tables/maps.json", p) as List<object>;
             var names = new Dictionary<string, string>();
@@ -91,17 +116,18 @@ namespace RPGWorkshop
             if (Read("tables/quests.json", p) is List<object> q) p.quests.AddRange(q);
             if (Read("dialogue/dialogs.json", p) is List<object> d) p.dialogs.AddRange(d);
             if (Read("tables/hero.json", p) is List<object> h && h.Count > 0) p.hero = h[0] as Dictionary<string, object>;
-            if (Read("inputs.json", p) is Dictionary<string, object> inp) p.title = J.S(inp, "name");
+            if (Read("title.json", p) is string t) p.title = t;
             return p;
         }
 
         static object Read(string rel, ContentPack p)
         {
-            var path = Path.Combine(p.root, rel);
-            if (!File.Exists(path)) return null;
-            try { return MiniJson.Parse(File.ReadAllText(path)); }
+            try { return p.reader(rel); }
             catch (System.Exception e) { p.problems.Add(rel + " 读取失败：" + e.Message); return null; }
         }
+
+        // 模板自带的素材（StreamingAssets/artkit/tiles），启动时由 RPGGame 异步加载进来，网页版也能用
+        public static readonly Dictionary<string, Texture2D> ArtKit = new Dictionary<string, Texture2D>();
 
         static void Index(object rows, Dictionary<string, Dictionary<string, object>> into)
         {
@@ -126,13 +152,12 @@ namespace RPGWorkshop
             return null;
         }
 
-        // 瓦片图片：先找内容包里的 art/tiles/<名字>.png（这一个游戏专用），
-        // 再找模板自带的 StreamingAssets/artkit/tiles/（换内容包也不会丢）；都没有就用代码画的
+        // 瓦片图片：先找内容包里的 art/tiles/<名字>.png（这一个游戏专用，电脑版才有），
+        // 再找模板自带的素材（换内容包也不会丢）；都没有就用代码画的
         public Texture2D TileOverride(string name)
         {
-            var path = Path.Combine(root, "art", "tiles", name + ".png");
-            if (!File.Exists(path)) path = Path.Combine(Application.streamingAssetsPath, "artkit", "tiles", name + ".png");
-            if (!File.Exists(path)) return null;
+            var path = root == "" ? "" : Path.Combine(root, "art", "tiles", name + ".png");
+            if (path == "" || !File.Exists(path)) return ArtKit.TryGetValue(name, out var kit) ? kit : null;
             var t = new Texture2D(2, 2) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
             return t.LoadImage(File.ReadAllBytes(path)) ? t : null;
         }

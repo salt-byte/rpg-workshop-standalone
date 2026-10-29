@@ -40,15 +40,21 @@ namespace RPGWorkshop.EditorTools
         static void OpenScene()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            EnsureScene();
+            EditorSceneManager.OpenScene(ScenePath);
+        }
+
+        // 空场景就够了：按播放时 RPGGame 会自动创建地图、镜头、玩家
+        public static string EnsureScene()
+        {
             if (!File.Exists(ScenePath))
             {
                 Directory.CreateDirectory("Assets/Scenes");
-                // 空场景就够了：按播放时 RPGGame 会自动创建地图、镜头、玩家
                 var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
                 EditorSceneManager.SaveScene(scene, ScenePath);
             }
-            EditorSceneManager.OpenScene(ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+            return ScenePath;
         }
 
         [MenuItem("RPG 工坊/3. 打开内容包文件夹", priority = 3)]

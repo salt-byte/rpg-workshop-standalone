@@ -4,6 +4,7 @@ using NavMeshPlus.Extensions;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Networking;
 using UnityEngine.Tilemaps;
 
 namespace RPGWorkshop
@@ -54,9 +55,37 @@ namespace RPGWorkshop
         List<string> fallbackLines;
         int fallbackIdx;
 
-        void Start()
+#if UNITY_WEBGL && !UNITY_EDITOR
+        // 网页版：RPG 工坊在同一个网站下把内容写进 localStorage，见 Plugins/WebGL/RPGBridge.jslib
+        [System.Runtime.InteropServices.DllImport("__Internal")] static extern string RPG_GetPack();
+#endif
+
+        // StreamingAssets 里的文件：网页版是网址，电脑版是本地路径，统一用 UnityWebRequest 读
+        static string SAUrl(string rel)
         {
+            var b = Application.streamingAssetsPath;
+            return (b.Contains("://") ? b : "file://" + b) + "/" + rel;
+        }
+
+        System.Collections.IEnumerator Start()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            string json = null;
+            try { json = RPG_GetPack(); } catch (System.Exception e) { Debug.LogWarning(e); }
+            if (string.IsNullOrEmpty(json))
+            {
+                // 没从工坊传内容过来：放示例
+                using (var r = UnityWebRequest.Get(SAUrl("sample_pack.json")))
+                {
+                    yield return r.SendWebRequest();
+                    json = r.result == UnityWebRequest.Result.Success ? r.downloadHandler.text : null;
+                }
+            }
+            pack = ContentPack.FromBundle(json ?? "");
+#else
             pack = ContentPack.Load(ContentPack.DefaultRoot);
+#endif
+            yield return LoadArtKit();
             PixelArt.overrides = pack;
             PixelArt.ClearCache();
             SetupCamera();
@@ -64,6 +93,33 @@ namespace RPGWorkshop
             SetupWorld();
             LoadMap(pack.maps[0], null);
             Say("来到「" + map.name + "」。点地面走过去，点 NPC 说话，点宝箱打开；也可以用 WASD / 方向键走，空格和身边的人说话。");
+        }
+
+        // 读模板自带的瓦片素材：artkit/index.json 列出文件名，逐个下载成贴图
+        System.Collections.IEnumerator LoadArtKit()
+        {
+            if (ContentPack.ArtKit.Count > 0) yield break;
+            List<object> names = null;
+            using (var r = UnityWebRequest.Get(SAUrl("artkit/index.json")))
+            {
+                yield return r.SendWebRequest();
+                if (r.result == UnityWebRequest.Result.Success) names = MiniJson.Parse(r.downloadHandler.text) as List<object>;
+            }
+            if (names == null) yield break;
+            foreach (var n in names)
+            {
+                var name = n as string;
+                if (string.IsNullOrEmpty(name)) continue;
+                using (var r = UnityWebRequestTexture.GetTexture(SAUrl("artkit/tiles/" + name + ".png"), true))
+                {
+                    yield return r.SendWebRequest();
+                    if (r.result != UnityWebRequest.Result.Success) continue;
+                    var t = DownloadHandlerTexture.GetContent(r);
+                    t.filterMode = FilterMode.Point;
+                    t.wrapMode = TextureWrapMode.Clamp;
+                    ContentPack.ArtKit[name] = t;
+                }
+            }
         }
 
         // ---------- 搭建 ----------
@@ -459,10 +515,13 @@ namespace RPGWorkshop
         // ---------- 界面（IMGUI，不依赖任何 UI 资源） ----------
 
         GUIStyle box, label, btn, nameStyle;
+        Font font;
 
         void OnGUI()
         {
             float k = Mathf.Max(1f, Screen.height / 720f);
+            if (font == null) font = Resources.Load<Font>("Fonts/FusionPixel"); // 网页版没有系统字体，中文必须用打包进来的字体
+            if (font != null) GUI.skin.font = font;
             if (box == null)
             {
                 box = new GUIStyle(GUI.skin.box) { alignment = TextAnchor.UpperLeft, wordWrap = true };
@@ -470,9 +529,10 @@ namespace RPGWorkshop
                 btn = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.MiddleLeft };
                 nameStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
             }
-            box.fontSize = label.fontSize = btn.fontSize = Mathf.RoundToInt(17 * k);
+            int px = 12 * Mathf.Max(1, Mathf.RoundToInt(1.5f * k)); // 像素字体按 12 的整数倍放大才清楚
+            box.fontSize = label.fontSize = btn.fontSize = px;
             box.padding = new RectOffset((int)(14 * k), (int)(14 * k), (int)(10 * k), (int)(10 * k));
-            nameStyle.fontSize = Mathf.RoundToInt(12 * k);
+            nameStyle.fontSize = 12 * Mathf.Max(1, Mathf.RoundToInt(k));
 
             if (pack == null) return;
             if (pack.maps.Count == 0)

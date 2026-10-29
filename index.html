@@ -225,6 +225,7 @@ span[contenteditable]:focus{outline:2px solid var(--accent);outline-offset:1px;b
       <button class="btn ghost" id="btnCfg" title="文本模型和图片模型的接口设置">⚙ 设置</button>
       <button class="btn ghost" id="btnHelp" title="新手指南">？指南</button>
       <button class="btn" id="btnPlay">文本试玩</button>
+      <button class="btn" id="btnUnity" title="在浏览器里用 Unity 做的游戏试玩当前项目（地图线做完后可用）">▶ Unity 试玩</button>
       <button class="btn" id="btnExport" title="需要环节 9 校验通过">导出内容包</button>
     </div>
   </header>
@@ -1306,18 +1307,26 @@ function mpDraw(){const P=S.mp;const cv=$('#mpCanvas');if(!P||!cv)return;const G
   mpFollow();const lg=$('#mpLog');if(lg)lg.innerHTML=P.log.map(esc).join('<br>')+(P.got.length?`<br><span class="hint">背包：${esc(P.got.join('、'))}</span>`:'')}
 function renderMapPlay(d){const maps=d.maps||[];if(!maps.length)return '';const P=S.mp&&maps.some(m=>m.id===S.mp.mid)?S.mp:null;const cur=P&&maps.find(m=>m.id===P.mid);const G=P&&mpGrid(P.mid);
   return `<div class="card mpbox"><div class="row" style="justify-content:space-between"><h3 style="margin:0">可走地图（${maps.length} 张）${cur?` · 现在在「${esc(cur.name||cur.id)}」<span class="hint">${G.W}×${G.H} 格 · ${{town:'村镇',field:'野外',dungeon:'地牢'}[G.kind]}布局</span>`:''}</h3>
-  <div class="row">${P?`<select id="mpSel">${maps.map(m=>`<option value="${esc(m.id)}" ${m.id===P.mid?'selected':''}>${esc(m.name||m.id)}</option>`).join('')}</select><button class="btn" id="mpReroll" title="同样的事件，换一种随机布局">换一个布局</button><button class="btn" id="mpQuit">收起</button>`:`<button class="btn primary" id="mpGo">▶ 试走地图</button>`}</div></div>
+  <div class="row">${P?`<select id="mpSel">${maps.map(m=>`<option value="${esc(m.id)}" ${m.id===P.mid?'selected':''}>${esc(m.name||m.id)}</option>`).join('')}</select><button class="btn" id="mpReroll" title="同样的事件，换一种随机布局">换一个布局</button><button class="btn" id="mpQuit">收起</button>`:`<button class="btn primary" id="mpGo">▶ 试走地图</button><button class="btn" id="mpUnity">▶ 在 Unity 里玩</button>`}</div></div>
   ${P?`<p class="hint" style="margin:6px 0">布局由代码按地图类型（村镇 / 野外 / 地牢）生成，不花钱；人、宝箱、敌群、传送门按事件表的坐标摆放，保证都能走到。像素瓦片和小人都是代码画的预览，做游戏时换成真正的瓦片集。粉衣黄披风的是你，头上有名字的是 NPC，红色怪物是敌群，箱子是宝箱，紫色光门 / 地牢台阶是传送点（走上去换地图）。</p>
   <div class="mpwrap"><canvas id="mpCanvas" tabindex="0"></canvas></div>
   <div class="row mppad"><button class="btn" data-mv="0,-1">↑</button><button class="btn" data-mv="-1,0">←</button><button class="btn" data-mv="0,1">↓</button><button class="btn" data-mv="1,0">→</button></div>
   <div class="mplog" id="mpLog"></div>`:'<p class="hint" style="margin:6px 0 0">用代码生成每张地图的格子布局，在这里直接走：碰到 NPC 会说话，宝箱能打开，走上传送门会切换地图。这是地图线的试玩结果。</p>'}</div>`}
-function bindMapPlay(){const go=$('#mpGo');if(go)go.onclick=()=>mpStart();const q=$('#mpQuit');if(q)q.onclick=()=>{S.mp=null;render()};
+function bindMapPlay(){const go=$('#mpGo');if(go)go.onclick=()=>mpStart();const gu=$('#mpUnity');if(gu)gu.onclick=playUnity;const q=$('#mpQuit');if(q)q.onclick=()=>{S.mp=null;render()};
   const sel=$('#mpSel');if(sel)sel.onchange=()=>mpStart(sel.value);
   const rr=$('#mpReroll');if(rr)rr.onclick=async()=>{const m=(S.stages[8]?.data?.maps||[]).find(x=>x.id===S.mp.mid);if(!m)return;m.layout_seed=(m.layout_seed||0)+1;await saveStage(8);mpStart(m.id)};
   document.querySelectorAll('[data-mv]').forEach(b=>b.onclick=()=>{const[a,c]=b.dataset.mv.split(',').map(Number);mpMove(a,c)});
   const cv=$('#mpCanvas');if(cv)cv.onclick=e=>{const r=cv.getBoundingClientRect();mpWalkTo(Math.floor((e.clientX-r.left)/r.width*cv.width/24),Math.floor((e.clientY-r.top)/r.height*cv.height/24))};
   if(S.mp)mpDraw()}
 document.addEventListener('keydown',e=>{if(!S.mp||S.cur!==8||S.play)return;const t=e.target;if(t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))return;const k={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],W:[0,-1],S:[0,1],A:[-1,0],D:[1,0]}[e.key];if(!k||!$('#mpCanvas'))return;e.preventDefault();mpMove(k[0],k[1])});
+// Unity 网页版试玩：把内容打成一个 JSON 写进 localStorage（游戏和工坊同一个网站，能读到），再打开 play/
+async function playUnity(){
+  const T=tables();if(!T.maps.length){toast('先在环节 8 生成地图，Unity 里才有地方可走');return}
+  try{const r=await fetch('play/index.html',{method:'HEAD',cache:'no-store'});if(!r.ok)throw 0}catch(e){toast('Unity 网页版还没在云端打包好，见 unity-template/CLOUD_BUILD.md');return}
+  const pack={'tables/map_grids.json':mapGridsJson(),'tables/maps.json':T.maps,'tables/npcs.json':T.npcs,'tables/items.json':T.items,'tables/troops.json':T.troops,'tables/enemies.json':T.enemies,'tables/quests.json':T.quests,'tables/hero.json':T.hero&&Object.keys(T.hero).length?[T.hero]:[],'dialogue/dialogs.json':T.dialogs,'title.json':T.world.title||S.P.name};
+  const json=JSON.stringify(pack);
+  try{localStorage.setItem('rpgws:playpack',json)}catch(e){toast(`内容太大（${Math.round(json.length/1024)} KB），浏览器存不下`);return}
+  window.open('play/index.html','_blank')}
 function mapGridsJson(){return tables().maps.map(m=>{const G=mpGrid(m.id);return{map_id:m.id,width:G.W,height:G.H,kind:G.kind,legend:{'.':'草地/空地',',':'路/地板','#':'墙','T':'树','~':'水','H':'房屋','+':'门'},rows:G.g.map(r=>r.join('')),spawn:G.spawn,events:G.evs.map(e=>({id:e.id,type:e.type,ref:e.ref,x:e.x,y:e.y}))}})}
 async function genAllPortraits(){const chars=(S.stages[3]?.data?.characters||[]).filter(c=>!portraitUrl(c));for(const c of chars){if(S.cur!==3)break;await genPortrait(c.id)}}
 /* settings sheet */
@@ -1355,7 +1364,7 @@ async function standalone(){
   const c=cfgGet();if(c.text.mode==='auto'||c.text.mode==='backend'){if(!c.backend.base&&!c.backend.token){try{const r=await fetch('/api/health');if(!r.ok)throw 0}catch(e){toast('独立版：先点右上角"⚙ 设置"填后端地址，或填 key 直连')}}}
 }
 async function boot(hot){
-  $('#btnNew').onclick=newProject;$('#btnExport').onclick=exportZip;$('#btnPlay').onclick=()=>{if(S.play){S.play=null;render()}else startPlay()};
+  $('#btnNew').onclick=newProject;$('#btnExport').onclick=exportZip;$('#btnPlay').onclick=()=>{if(S.play){S.play=null;render()}else startPlay()};$('#btnUnity').onclick=playUnity;
   $('#tier').onchange=e=>S.tier=e.target.value;
   $('#btnHelp').onclick=()=>{$('#help').hidden=false};$('#btnHelpClose').onclick=()=>{$('#help').hidden=true};$('#help').onclick=e=>{if(e.target.id==='help')$('#help').hidden=true};
   render();
